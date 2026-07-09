@@ -799,6 +799,55 @@ end;
 
 {$ALIGN 8}
 type
+  LeapfrogSexualRiskParamsView = record
+  private
+    srContactRate: PDouble;
+    srContactRateLength: Integer;
+    srClassProp: PDouble;
+    srClassPropLength: Integer;
+    srInterventionMult: PDouble;
+    srInterventionMultLength: Integer;
+    srKpProp: PDouble;
+    srKpPropLength: Integer;
+    srKpIrr: PDouble;
+    srKpIrrLength: Integer;
+    srKpInterventionMult: PDouble;
+    srKpInterventionMultLength: Integer;
+end;
+
+type
+  LeapfrogSexualRiskParams = class
+  public
+    srContactRate: TGBFixedArray<Double>;
+    srClassProp: TGBFixedArray<Double>;
+    srInterventionMult: TGBFixedArray<Double>;
+    srKpProp: TGBFixedArray<Double>;
+    srKpIrr: TGBFixedArray<Double>;
+    srKpInterventionMult: TGBFixedArray<Double>;
+    function getView(): LeapfrogSexualRiskParamsView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
+  LeapfrogSexualRiskStateView = record
+  private
+    srInfectedClass: PDouble;
+    srInfectedClassLength: Integer;
+end;
+
+type
+  LeapfrogSexualRiskState = class
+  public
+    srInfectedClass: TGBFixedArray<Double>;
+    function getView(): LeapfrogSexualRiskStateView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
   LeapfrogParams = record
   private
     demproj: ^LeapfrogDemProjParamsView;
@@ -807,6 +856,7 @@ type
     spectrum: ^LeapfrogSpectrumParamsView;
     goals: ^LeapfrogGoalsParamsView;
     virgin: ^LeapfrogVirginParamsView;
+    sexualrisk: ^LeapfrogSexualRiskParamsView;
   public
     procedure SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
     procedure SetHivAdultParams(const hivadultParams: LeapfrogHivAdultParamsView);
@@ -814,6 +864,7 @@ type
     procedure SetSpectrumParams(const spectrumParams: LeapfrogSpectrumParamsView);
     procedure SetGoalsParams(const goalsParams: LeapfrogGoalsParamsView);
     procedure SetVirginParams(const virginParams: LeapfrogVirginParamsView);
+    procedure SetSexualRiskParams(const sexualriskParams: LeapfrogSexualRiskParamsView);
 end;
 
 {$ALIGN 8}
@@ -826,6 +877,7 @@ type
     spectrum: ^LeapfrogSpectrumStateView;
     goals: ^LeapfrogGoalsStateView;
     virgin: ^LeapfrogVirginStateView;
+    sexualrisk: ^LeapfrogSexualRiskStateView;
   public
     procedure SetDemProjState(const demprojState: LeapfrogDemProjStateView);
     procedure SetHivAdultState(const hivadultState: LeapfrogHivAdultStateView);
@@ -833,6 +885,7 @@ type
     procedure SetSpectrumState(const spectrumState: LeapfrogSpectrumStateView);
     procedure SetGoalsState(const goalsState: LeapfrogGoalsStateView);
     procedure SetVirginState(const virginState: LeapfrogVirginStateView);
+    procedure SetSexualRiskState(const sexualriskState: LeapfrogSexualRiskStateView);
 end;
 
 type TCallbackFunction = procedure(Msg: PAnsiChar); stdcall;
@@ -1529,6 +1582,45 @@ begin;
   Result.hArtpopVirginLength := hArtpopVirgin.GetLength();
 end;
 
+destructor LeapfrogSexualRiskParams.Destroy;
+begin;
+  srContactRate.Free;
+  srClassProp.Free;
+  srInterventionMult.Free;
+  srKpProp.Free;
+  srKpIrr.Free;
+  srKpInterventionMult.Free;
+  inherited;
+end;
+
+destructor LeapfrogSexualRiskState.Destroy;
+begin;
+  srInfectedClass.Free;
+  inherited;
+end;
+
+function LeapfrogSexualRiskParams.getView(): LeapfrogSexualRiskParamsView;
+begin;
+  Result.srContactRate := PDouble(srContactRate.data);
+  Result.srContactRateLength := srContactRate.GetLength();
+  Result.srClassProp := PDouble(srClassProp.data);
+  Result.srClassPropLength := srClassProp.GetLength();
+  Result.srInterventionMult := PDouble(srInterventionMult.data);
+  Result.srInterventionMultLength := srInterventionMult.GetLength();
+  Result.srKpProp := PDouble(srKpProp.data);
+  Result.srKpPropLength := srKpProp.GetLength();
+  Result.srKpIrr := PDouble(srKpIrr.data);
+  Result.srKpIrrLength := srKpIrr.GetLength();
+  Result.srKpInterventionMult := PDouble(srKpInterventionMult.data);
+  Result.srKpInterventionMultLength := srKpInterventionMult.GetLength();
+end;
+
+function LeapfrogSexualRiskState.getView(): LeapfrogSexualRiskStateView;
+begin;
+  Result.srInfectedClass := PDouble(srInfectedClass.data);
+  Result.srInfectedClassLength := srInfectedClass.GetLength();
+end;
+
 procedure LeapfrogDemProjParams.writeToDisk(dir: string);
 begin;
   if not DirectoryExists(dir) then
@@ -1762,6 +1854,25 @@ begin;
   hArtpopVirgin.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'hArtpopVirgin');
 end;
 
+procedure LeapfrogSexualRiskParams.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+  srContactRate.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srContactRate');
+  srClassProp.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srClassProp');
+  srInterventionMult.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInterventionMult');
+  srKpProp.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpProp');
+  srKpIrr.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpIrr');
+  srKpInterventionMult.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpInterventionMult');
+end;
+
+procedure LeapfrogSexualRiskState.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+  srInfectedClass.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectedClass');
+end;
+
 procedure LeapfrogParams.SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
 begin
   demproj := @demprojParams;
@@ -1820,6 +1931,16 @@ end;
 procedure LeapfrogState.SetVirginState(const virginState: LeapfrogVirginStateView);
 begin
   virgin := @virginState;
+end;
+
+procedure LeapfrogParams.SetSexualRiskParams(const sexualriskParams: LeapfrogSexualRiskParamsView);
+begin
+  sexualrisk := @sexualriskParams;
+end;
+
+procedure LeapfrogState.SetSexualRiskState(const sexualriskState: LeapfrogSexualRiskStateView);
+begin
+  sexualrisk := @sexualriskState;
 end;
 
 end.

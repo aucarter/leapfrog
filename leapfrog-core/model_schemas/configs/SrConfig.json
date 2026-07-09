@@ -1,0 +1,45 @@
+{
+  "name": "Sr",
+  "long_name": "SexualRisk",
+  "namespace": "sr",
+  "enable_if": "run_sr",
+  "state_space": {
+    "default": {
+      "NCLASS": 3,
+      "NKP": 3
+    }
+  },
+  "pars": {
+    "sr_contact_rate": {
+      "num_type": "real_type",
+      "dims": ["SS::NCLASS"]
+    },
+    "sr_class_prop": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS", "SS::NCLASS", "opts.proj_steps"]
+    },
+    "sr_intervention_mult": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS", "SS::NCLASS", "opts.proj_steps"]
+    },
+    "sr_kp_prop": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS", "SS::NKP", "opts.proj_steps"]
+    },
+    "sr_kp_irr": {
+      "num_type": "real_type",
+      "dims": ["SS::NKP", "opts.proj_steps"]
+    },
+    "sr_kp_intervention_mult": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS", "SS::NKP", "opts.proj_steps"]
+    }
+  },
+  "intermediate": {},
+  "state": {
+    "sr_infected_class": {
+      "num_type": "real_type",
+      "dims": ["SS::NS", "SS::NCLASS"]
+    }
+  }
+}

@@ -21,7 +21,8 @@ std::vector<std::string> list_model_configurations() {
     "CoarseChildModel",
     "Spectrum",
     "GBD",
-    "GBDvirgin"
+    "GBDvirgin",
+    "HivStructuralRate"
   };
 }
 
@@ -149,6 +150,8 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::GBD>(std::forward<Args>(args)...);
   } else if (configuration == "GBDvirgin") {
     return simulate_model<leapfrog::GBDvirgin>(std::forward<Args>(args)...);
+  } else if (configuration == "HivStructuralRate") {
+    return simulate_model<leapfrog::HivStructuralRate>(std::forward<Args>(args)...);
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;
@@ -225,6 +228,8 @@ Rcpp::List get_leapfrog_ss(
     return leapfrog::get_ss_r<leapfrog::GBD>();
   } else if (configuration == "GBDvirgin") {
     return leapfrog::get_ss_r<leapfrog::GBDvirgin>();
+  } else if (configuration == "HivStructuralRate") {
+    return leapfrog::get_ss_r<leapfrog::HivStructuralRate>();
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;

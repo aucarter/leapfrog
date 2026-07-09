@@ -98,6 +98,12 @@ struct AdultHivModelSimulation<Config> {
       }
       calc_new_infections_agesex_goals(hiv_step);
 
+    } else if constexpr (ModelVariant::run_sr) {
+
+      // Structural-rate incidence engine: SHIPP sexual-risk classes +
+      // reduced-form KP overlay, interventions embedded in the FOI (§4).
+      calc_new_infections_incidmod_sr(hiv_step);
+
     } else {
 
       if (p_ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS) {
@@ -344,6 +350,158 @@ struct AdultHivModelSimulation<Config> {
       real_type hivn_a = n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s);
       i_ha.p_infections_ts(a, s) = hivn_a * incrate15to49_s[s] * p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * Xhivn_s[s] / Xhivn_incagerr[s];
     }
+  }
+
+  // Structural-rate incidence engine (methods §4; R reference
+  // calc_infections_draft.R). Computes annualized new infections
+  // i_ha.p_infections_ts(a, s) from a calibrated structural rate (reusing the
+  // transmission_rate_hts slot as r_struct), SHIPP sexual-risk classes with
+  // per-exposure intervention multipliers M, and a reduced-form key-population
+  // overlay. Only p_infections_ts is written here; the shared CD4/ART cascade
+  // downstream (add_new_hiv_infections, progression, mortality) stays
+  // class-agnostic (partial stratification, §9). Gated by run_sr.
+  void calc_new_infections_incidmod_sr(int hiv_step) {
+    const auto& p_ha = pars.ha;
+    const auto& p_sr = pars.sr;
+    auto& n_ha = state_next.ha;
+    auto& n_dp = state_next.dp;
+    auto& n_sr = state_next.sr;
+    auto& i_ha = intermediate.ha;
+
+    constexpr int NCLASS = SS::NCLASS;
+    constexpr int NKP = SS::NKP;
+    const int a_lo = SS::pIDX_15to49;
+    const int a_hi = SS::pIDX_15to49 + SS::pAG_15to49;          // 15-49 pool
+    const int current_hiv_time_step = t * opts.hts_per_year + hiv_step;
+    const real_type r_struct = p_ha.transmission_rate_hts[current_hiv_time_step];
+
+    // -- 1. Infectiousness weight omega_s (ART-as-prevention; §4.2). off-ART
+    //    infectiousness = 1 (matches base transmrate kernel — per-CD4 psi is a
+    //    future refinement); on-ART = relative_infectiousness_art. -----------
+    real_type omega[NS];
+    for (int s = 0; s < NS; ++s) {
+      real_type noart = 0.0, onart = 0.0;
+      for (int ha = SS::hIDX_15to49; ha < SS::hIDX_15to49 + SS::hAG_15to49; ++ha) {
+        for (int hm = 0; hm < hDS; ++hm) {
+          noart += n_ha.h_hivpop(hm, ha, s);
+          if (t >= opts.ts_art_start) {
+            for (int hu = 0; hu < hTS; ++hu) onart += n_ha.h_artpop(hu, hm, ha, s);
+          }
+        }
+      }
+      const real_type npos = noart + onart;
+      omega[s] = npos > 0.0 ? (noart + p_ha.relative_infectiousness_art * onart) / npos : 0.0;
+    }
+
+    // -- 2. Rescale the light per-class infected headcount Ig to the current
+    //    HIV+ 15-49 count (class shares preserved). Keeps Ig consistent with
+    //    true prevalence while class structure evolves via new infections
+    //    (the virgin module's proportional-cascade idiom). NOTE: rescales to
+    //    total HIV+ incl. KP infecteds — a documented simplification (folds KP
+    //    into the pool mean-field; refine by tracking gen-pop prevalence). ---
+    //    Redistribute the true HIV+ headcount across classes by the current
+    //    shares (bounded in [0,1]); this keeps Ig total == prevalence exactly
+    //    and bounded (setting Ig = share*hivpos avoids the divide-by-tiny
+    //    blow-up an unbounded multiplicative rescale would cause as the class
+    //    headcount collapses). Fall back to contact-weighted shares when the
+    //    headcount has effectively vanished.
+    constexpr real_type kMinIg = 1e-8;
+    for (int s = 0; s < NS; ++s) {
+      real_type hivpos_s = 0.0;
+      for (int a = a_lo; a < a_hi; ++a) hivpos_s += std::max(real_type(0.0), n_ha.p_hivpop(a, s));
+      real_type sumIg = 0.0;
+      for (int g = 0; g < NCLASS; ++g) sumIg += n_sr.sr_infected_class(s, g);
+      if (sumIg > kMinIg) {
+        for (int g = 0; g < NCLASS; ++g)
+          n_sr.sr_infected_class(s, g) = (n_sr.sr_infected_class(s, g) / sumIg) * hivpos_s;
+      } else {
+        real_type csum = 0.0;
+        for (int g = 0; g < NCLASS; ++g) csum += p_sr.sr_contact_rate(g);
+        for (int g = 0; g < NCLASS; ++g)
+          n_sr.sr_infected_class(s, g) = csum > 0.0
+            ? (p_sr.sr_contact_rate(g) / csum) * hivpos_s
+            : hivpos_s / NCLASS;
+      }
+    }
+
+    // -- 3. Contact-weighted infectious prevalence pool P_eff (pooled over
+    //    both sexes; §4.1). Sg(a,s,g) = pi * (1 - sum_k q_k) * hivn. ---------
+    real_type pool_num = 0.0, pool_den = 0.0;
+    for (int s = 0; s < NS; ++s) {
+      for (int g = 0; g < NCLASS; ++g) {
+        const real_type cg = p_sr.sr_contact_rate(g);
+        real_type Nsg = n_sr.sr_infected_class(s, g);
+        for (int a = a_lo; a < a_hi; ++a) {
+          const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+          real_type qtot = 0.0;
+          for (int k = 0; k < NKP; ++k) qtot += p_sr.sr_kp_prop(a, s, k, t);
+          if (qtot > 1.0) qtot = 1.0;
+          Nsg += p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * hivn;
+        }
+        pool_num += cg * omega[s] * n_sr.sr_infected_class(s, g);
+        pool_den += cg * Nsg;
+      }
+    }
+    const real_type P_eff = pool_den > 0.0 ? pool_num / pool_den : 0.0;
+
+    // -- 4. Mean-preserving age/sex shape zeta, normalized over susceptibles
+    //    (15-49) so it sets the incidence distribution, not its level (§4.1). -
+    real_type zbar_num = 0.0, zbar_den = 0.0;
+    for (int s = 0; s < NS; ++s) {
+      const real_type sexrr = (s == MALE) ? 1.0 : p_ha.incidence_rate_ratio_sex(t);
+      for (int a = a_lo; a < a_hi; ++a) {
+        const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+        const real_type zeta = p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * sexrr;
+        zbar_num += zeta * hivn;
+        zbar_den += hivn;
+      }
+    }
+    const real_type zbar = zbar_den > 0.0 ? zbar_num / zbar_den : 1.0;
+
+    // -- 5. General-pop FOI + KP overlay -> annualized infections by age/sex --
+    const bool seeding = (p_ha.epidemic_start_hts == current_hiv_time_step);
+    nda::fill(i_ha.p_infections_ts, 0.0);
+    real_type newinf_class[NS][NCLASS];
+    for (int s = 0; s < NS; ++s)
+      for (int g = 0; g < NCLASS; ++g) newinf_class[s][g] = 0.0;
+
+    for (int s = 0; s < NS; ++s) {
+      const real_type sexrr = (s == MALE) ? 1.0 : p_ha.incidence_rate_ratio_sex(t);
+      for (int a = SS::p_idx_hiv_first_adult; a < pAG; ++a) {
+        const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+        real_type qtot = 0.0;
+        for (int k = 0; k < NKP; ++k) qtot += p_sr.sr_kp_prop(a, s, k, t);
+        if (qtot > 1.0) qtot = 1.0;
+        const real_type zeta = p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * sexrr / zbar;
+
+        real_type inf_gen_as = 0.0, Sg_as = 0.0;
+        for (int g = 0; g < NCLASS; ++g) {
+          const real_type cg = p_sr.sr_contact_rate(g);
+          const real_type Sg = p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * hivn;
+          const real_type lambda = r_struct * cg * P_eff * zeta * p_sr.sr_intervention_mult(a, s, g, t);
+          real_type inf = lambda * Sg;
+          if (seeding) inf += p_ha.initial_incidence * Sg;     // epidemic seed
+          i_ha.p_infections_ts(a, s) += inf;
+          inf_gen_as += inf;
+          Sg_as += Sg;
+          if (a >= a_lo && a < a_hi) newinf_class[s][g] += inf;
+        }
+
+        // KP overlay: lambda_k = irr_k * lam_bar_{a,s} * M_k on KP susceptibles
+        const real_type lam_bar = Sg_as > 0.0 ? inf_gen_as / Sg_as : 0.0;
+        for (int k = 0; k < NKP; ++k) {
+          const real_type Skp = p_sr.sr_kp_prop(a, s, k, t) * hivn;
+          i_ha.p_infections_ts(a, s) += p_sr.sr_kp_irr(k, t) * lam_bar *
+                                        p_sr.sr_kp_intervention_mult(a, s, k, t) * Skp;
+        }
+      }
+    }
+
+    // -- 6. Accumulate this step's new infections into the class headcount
+    //    (annualized * dt); rescale to prevalence happens at the next step. --
+    for (int s = 0; s < NS; ++s)
+      for (int g = 0; g < NCLASS; ++g)
+        n_sr.sr_infected_class(s, g) += opts.dt * newinf_class[s][g];
   }
 
   void calc_new_infections_agesex(int hiv_step) {
