@@ -393,6 +393,24 @@ struct AdultHivModelSimulation<Config> {
       omega[s] = npos > 0.0 ? (noart + p_ha.relative_infectiousness_art * onart) / npos : 0.0;
     }
 
+    // -- 1b. At-risk HIV-negative population by age/sex. Under run_virgin the
+    //    pre-debut ("virgin") HIV-negatives are removed from the sexual at-risk
+    //    pool (this closes the transmission-rate virgin TODO): pre-debut cannot
+    //    acquire sexual infection. Sexual debut (sexdebut_annual_prob) moves
+    //    them out of the virgin compartment into the at-risk SHIPP classes,
+    //    which is what produces age-appropriate 10-14 incidence.
+    real_type atrisk_hivn[pAG][NS];
+    for (int s = 0; s < NS; ++s)
+      for (int a = 0; a < pAG; ++a)
+        atrisk_hivn[a][s] = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+    if constexpr (ModelVariant::run_virgin) {
+      const auto& n_vg = state_next.vg;
+      for (int s = 0; s < NS; ++s)
+        for (int va = 0, a = SS::p_idx_virginpop_first; va < SS::vAG; ++va, ++a)
+          atrisk_hivn[a][s] = std::max(real_type(0.0),
+            atrisk_hivn[a][s] - (n_vg.p_totpop_virgin(va, s) - n_vg.p_hivpop_virgin(va, s)));
+    }
+
     // -- 2. Rescale the light per-class infected headcount Ig to the current
     //    HIV+ 15-49 count (class shares preserved). Keeps Ig consistent with
     //    true prevalence while class structure evolves via new infections
@@ -432,7 +450,7 @@ struct AdultHivModelSimulation<Config> {
         const real_type cg = p_sr.sr_contact_rate(g);
         real_type Nsg = n_sr.sr_infected_class(s, g);
         for (int a = a_lo; a < a_hi; ++a) {
-          const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+          const real_type hivn = atrisk_hivn[a][s];
           real_type qtot = 0.0;
           for (int k = 0; k < NKP; ++k) qtot += p_sr.sr_kp_prop(a, s, k, t);
           if (qtot > 1.0) qtot = 1.0;
@@ -450,7 +468,7 @@ struct AdultHivModelSimulation<Config> {
     for (int s = 0; s < NS; ++s) {
       const real_type sexrr = (s == MALE) ? 1.0 : p_ha.incidence_rate_ratio_sex(t);
       for (int a = a_lo; a < a_hi; ++a) {
-        const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+        const real_type hivn = atrisk_hivn[a][s];
         const real_type zeta = p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * sexrr;
         zbar_num += zeta * hivn;
         zbar_den += hivn;
@@ -468,7 +486,7 @@ struct AdultHivModelSimulation<Config> {
     for (int s = 0; s < NS; ++s) {
       const real_type sexrr = (s == MALE) ? 1.0 : p_ha.incidence_rate_ratio_sex(t);
       for (int a = SS::p_idx_hiv_first_adult; a < pAG; ++a) {
-        const real_type hivn = std::max(real_type(0.0), n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s));
+        const real_type hivn = atrisk_hivn[a][s];
         real_type qtot = 0.0;
         for (int k = 0; k < NKP; ++k) qtot += p_sr.sr_kp_prop(a, s, k, t);
         if (qtot > 1.0) qtot = 1.0;

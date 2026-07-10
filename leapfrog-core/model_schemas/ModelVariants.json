@@ -112,9 +112,9 @@
     "run_hiv_simulation": "true",
     "use_coarse_stratification": "false",
     "run_child_model": "true",
-    "age10_adult": "false",
-    "age105_open": "false",
-    "run_virgin": "false",
+    "age10_adult": "true",
+    "age105_open": "true",
+    "run_virgin": "true",
     "run_sr": "true",
     "run_spectrum_model": "false",
     "run_goals": "false"
