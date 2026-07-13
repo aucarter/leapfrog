@@ -215,7 +215,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
 
   art_dropout_recover_cd4 <- vers_str >= "6.14"
 
-  if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality)) {
+  if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality[1])) {
     # This is hardcoding which epp_idu_morality to pass through
     # it copies Spectrum which is assuming the the first subpop
     # will be PWID.
