@@ -922,6 +922,46 @@ end;
 
 {$ALIGN 8}
 type
+  LeapfrogEntrantsParamsView = record
+  private
+    entrantHivPrevalence: PDouble;
+    entrantHivPrevalenceLength: Integer;
+    entrantArtCoverage: PDouble;
+    entrantArtCoverageLength: Integer;
+    entrantCd4Distribution: PDouble;
+    entrantCd4DistributionLength: Integer;
+    entrantArtCd4Distribution: PDouble;
+    entrantArtCd4DistributionLength: Integer;
+end;
+
+type
+  LeapfrogEntrantsParams = class
+  public
+    entrantHivPrevalence: TGBFixedArray<Double>;
+    entrantArtCoverage: TGBFixedArray<Double>;
+    entrantCd4Distribution: TGBFixedArray<Double>;
+    entrantArtCd4Distribution: TGBFixedArray<Double>;
+    function getView(): LeapfrogEntrantsParamsView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
+  LeapfrogEntrantsStateView = record
+  private
+end;
+
+type
+  LeapfrogEntrantsState = class
+  public
+    function getView(): LeapfrogEntrantsStateView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
   LeapfrogParams = record
   private
     demproj: ^LeapfrogDemProjParamsView;
@@ -930,6 +970,7 @@ type
     spectrum: ^LeapfrogSpectrumParamsView;
     goals: ^LeapfrogGoalsParamsView;
     virgin: ^LeapfrogVirginParamsView;
+    entrants: ^LeapfrogEntrantsParamsView;
   public
     procedure SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
     procedure SetHivAdultParams(const hivadultParams: LeapfrogHivAdultParamsView);
@@ -937,6 +978,7 @@ type
     procedure SetSpectrumParams(const spectrumParams: LeapfrogSpectrumParamsView);
     procedure SetGoalsParams(const goalsParams: LeapfrogGoalsParamsView);
     procedure SetVirginParams(const virginParams: LeapfrogVirginParamsView);
+    procedure SetEntrantsParams(const entrantsParams: LeapfrogEntrantsParamsView);
 end;
 
 {$ALIGN 8}
@@ -949,6 +991,7 @@ type
     spectrum: ^LeapfrogSpectrumStateView;
     goals: ^LeapfrogGoalsStateView;
     virgin: ^LeapfrogVirginStateView;
+    entrants: ^LeapfrogEntrantsStateView;
   public
     procedure SetDemProjState(const demprojState: LeapfrogDemProjStateView);
     procedure SetHivAdultState(const hivadultState: LeapfrogHivAdultStateView);
@@ -956,6 +999,7 @@ type
     procedure SetSpectrumState(const spectrumState: LeapfrogSpectrumStateView);
     procedure SetGoalsState(const goalsState: LeapfrogGoalsStateView);
     procedure SetVirginState(const virginState: LeapfrogVirginStateView);
+    procedure SetEntrantsState(const entrantsState: LeapfrogEntrantsStateView);
 end;
 
 type TCallbackFunction = procedure(Msg: PAnsiChar); stdcall;
@@ -1759,6 +1803,36 @@ begin;
   Result.hArtpopVirginLength := hArtpopVirgin.GetLength();
 end;
 
+destructor LeapfrogEntrantsParams.Destroy;
+begin;
+  entrantHivPrevalence.Free;
+  entrantArtCoverage.Free;
+  entrantCd4Distribution.Free;
+  entrantArtCd4Distribution.Free;
+  inherited;
+end;
+
+destructor LeapfrogEntrantsState.Destroy;
+begin;
+  inherited;
+end;
+
+function LeapfrogEntrantsParams.getView(): LeapfrogEntrantsParamsView;
+begin;
+  Result.entrantHivPrevalence := PDouble(entrantHivPrevalence.data);
+  Result.entrantHivPrevalenceLength := entrantHivPrevalence.GetLength();
+  Result.entrantArtCoverage := PDouble(entrantArtCoverage.data);
+  Result.entrantArtCoverageLength := entrantArtCoverage.GetLength();
+  Result.entrantCd4Distribution := PDouble(entrantCd4Distribution.data);
+  Result.entrantCd4DistributionLength := entrantCd4Distribution.GetLength();
+  Result.entrantArtCd4Distribution := PDouble(entrantArtCd4Distribution.data);
+  Result.entrantArtCd4DistributionLength := entrantArtCd4Distribution.GetLength();
+end;
+
+function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;
+begin;
+end;
+
 procedure LeapfrogDemProjParams.writeToDisk(dir: string);
 begin;
   if not DirectoryExists(dir) then
@@ -2011,6 +2085,22 @@ begin;
   hArtpopVirgin.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'hArtpopVirgin');
 end;
 
+procedure LeapfrogEntrantsParams.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+  entrantHivPrevalence.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantHivPrevalence');
+  entrantArtCoverage.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantArtCoverage');
+  entrantCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantCd4Distribution');
+  entrantArtCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantArtCd4Distribution');
+end;
+
+procedure LeapfrogEntrantsState.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+end;
+
 procedure LeapfrogParams.SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
 begin
   demproj := @demprojParams;
@@ -2069,6 +2159,16 @@ end;
 procedure LeapfrogState.SetVirginState(const virginState: LeapfrogVirginStateView);
 begin
   virgin := @virginState;
+end;
+
+procedure LeapfrogParams.SetEntrantsParams(const entrantsParams: LeapfrogEntrantsParamsView);
+begin
+  entrants := @entrantsParams;
+end;
+
+procedure LeapfrogState.SetEntrantsState(const entrantsState: LeapfrogEntrantsStateView);
+begin
+  entrants := @entrantsState;
 end;
 
 end.

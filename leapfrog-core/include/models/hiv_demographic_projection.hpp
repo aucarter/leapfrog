@@ -63,6 +63,9 @@ struct HivDemographicProjection<Config> {
       run_age_15_entrants();
     }
     run_hiv_and_art_stratified_ageing();
+    if constexpr (ModelVariant::run_static_entrants) {
+      run_static_age_15_entrants();
+    }
     run_hiv_and_art_stratified_deaths_and_migration();
     if constexpr (ModelVariant::run_child_model) {
       run_hc_hiv_and_art_stratified_deaths_and_migration();
@@ -430,8 +433,55 @@ struct HivDemographicProjection<Config> {
         }
       }
     } // s
-    // TODO: implement static entrants to adult HIV population here for case when child model not simulated
+  };
 
+  // Exogenous age-15 entrants for variants that do not simulate paediatric
+  // dynamics. Mirrors Spectrum/EPP-ASM, which reads the age-15 HIV+ inflow and
+  // its CD4 composition from a prior paediatric projection rather than
+  // simulating it (eppasm/R/eppasm.R, entrantprev/entrantartcov/paedsurv_*).
+  //
+  // Runs after run_hiv_and_art_stratified_ageing(), which *assigns* the ha = 0
+  // compartments; entrants are added on top, exactly as the child-model path
+  // does. p_hivpop is updated in step because the single-age and CD4-stratified
+  // adult populations are required to agree.
+  void run_static_age_15_entrants() {
+    static_assert(!ModelVariant::run_child_model,
+                  "run_static_age_15_entrants would double-count entrants when "
+                  "the child model is simulated");
+    const auto& p_en = pars.en;
+    const auto& n_dp = state_next.dp;
+    auto& n_ha = state_next.ha;
+    constexpr int a0 = p_idx_hiv_first_adult;
+
+    for (int s = 0; s < NS; ++s) {
+      // The age-15 population comes from the demographic projection, which has
+      // already run for this year; only its HIV+ share is supplied here.
+      const real_type hivp_entrants =
+        n_dp.p_totpop(a0, s) * p_en.entrant_hiv_prevalence(s, t);
+      if (!(hivp_entrants > 0.0)) {
+        continue;
+      }
+
+      const bool art_started = t > opts.ts_art_start;
+      const real_type artcov =
+        art_started ? p_en.entrant_art_coverage(s, t) : 0.0;
+      const real_type entrants_no_art = hivp_entrants * (1.0 - artcov);
+      const real_type entrants_art = hivp_entrants * artcov;
+
+      n_ha.p_hivpop(a0, s) += hivp_entrants;
+
+      for (int hm = 0; hm < hDS; ++hm) {
+        n_ha.h_hivpop(hm, 0, s) +=
+          entrants_no_art * p_en.entrant_cd4_distribution(hm, s, t);
+
+        if (entrants_art > 0.0) {
+          for (int hu = 0; hu < hTS; ++hu) {
+            n_ha.h_artpop(hu, hm, 0, s) +=
+              entrants_art * p_en.entrant_art_cd4_distribution(hu, hm, s, t);
+          }
+        }
+      }
+    } // s
   };
 
   void run_hiv_and_art_stratified_deaths_and_migration() {

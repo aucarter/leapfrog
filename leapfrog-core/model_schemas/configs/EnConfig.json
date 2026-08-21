@@ -1,0 +1,43 @@
+{
+  "name": "En",
+  "long_name": "Entrants",
+  "namespace": "en",
+  "enable_if": "run_static_entrants",
+  "state_space": {
+    "default": {}
+  },
+  "pars": {
+    "entrant_hiv_prevalence": {
+      "num_type": "real_type",
+      "dims": ["SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "entrantprev"
+      }
+    },
+    "entrant_art_coverage": {
+      "num_type": "real_type",
+      "dims": ["SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "entrantartcov"
+      }
+    },
+    "entrant_cd4_distribution": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "paedsurv_cd4dist"
+      }
+    },
+    "entrant_art_cd4_distribution": {
+      "num_type": "real_type",
+      "dims": ["SS::hTS", "SS::hDS", "SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "paedsurv_artcd4dist"
+      }
+    }
+  },
+  "intermediate": {
+  },
+  "state": {
+  }
+}

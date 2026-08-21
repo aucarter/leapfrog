@@ -253,3 +253,26 @@ test_that("Transmission rate models produces expected epidemics", {
 
 
 })
+
+test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
+  pjnz <- system.file("pjnz/bwa_aim-adult-art-no-special-elig_v6.13_2022-04-18.PJNZ", package = "leapfrog")
+  for (coarse in c(FALSE, TRUE)) {
+    base <- if (coarse) "HivCoarseAgeStratification" else "HivFullAgeStratification"
+    p <- process_pjnz(pjnz, use_coarse_age_groups = coarse)
+    n_years <- dim(p$basepop)[3]
+    hDS <- dim(p$cd4_mort)[1]; hTS <- dim(p$art_mort)[1]
+    entrants <- function(prev) list(
+      entrantprev = matrix(prev, 2, n_years),
+      entrantartcov = matrix(0, 2, n_years),
+      paedsurv_cd4dist = array(1 / hDS, c(hDS, 2, n_years)),
+      paedsurv_artcd4dist = array(1 / (hTS * hDS), c(hTS, hDS, 2, n_years)))
+    years <- 1970:2030
+    ref <- run_model(p, base, years)
+    zero <- run_model(c(p, entrants(0)), paste0(base, "Entrants"), years)
+    ## No inflow: identical to the parent variant
+    expect_equal(zero$p_hivpop, ref$p_hivpop)
+    one <- run_model(c(p, entrants(0.01)), paste0(base, "Entrants"), years)
+    ## Inflow raises HIV+ at age 15 above the parent variant (age index 16)
+    expect_true(all(one$p_hivpop[16, , 2:n_years] > ref$p_hivpop[16, , 2:n_years]))
+  }
+})
