@@ -16,6 +16,7 @@ std::vector<std::string> list_model_configurations() {
   return std::vector<std::string>{
     "DemographicProjection",
     "HivFullAgeStratification",
+    "HivFullAgeStratificationEntrants",
     "HivCoarseAgeStratification",
     "ChildModel",
     "CoarseChildModel",
@@ -138,6 +139,8 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::DemographicProjection>(std::forward<Args>(args)...);
   } else if (configuration == "HivFullAgeStratification") {
     return simulate_model<leapfrog::HivFullAgeStratification>(std::forward<Args>(args)...);
+  } else if (configuration == "HivFullAgeStratificationEntrants") {
+    return simulate_model<leapfrog::HivFullAgeStratificationEntrants>(std::forward<Args>(args)...);
   } else if (configuration == "HivCoarseAgeStratification") {
     return simulate_model<leapfrog::HivCoarseAgeStratification>(std::forward<Args>(args)...);
   } else if (configuration == "ChildModel") {
@@ -216,6 +219,8 @@ Rcpp::List get_leapfrog_ss(
     return leapfrog::get_ss_r<leapfrog::DemographicProjection>();
   } else if (configuration == "HivFullAgeStratification") {
     return leapfrog::get_ss_r<leapfrog::HivFullAgeStratification>();
+  } else if (configuration == "HivFullAgeStratificationEntrants") {
+    return leapfrog::get_ss_r<leapfrog::HivFullAgeStratificationEntrants>();
   } else if (configuration == "HivCoarseAgeStratification") {
     return leapfrog::get_ss_r<leapfrog::HivCoarseAgeStratification>();
   } else if (configuration == "ChildModel") {

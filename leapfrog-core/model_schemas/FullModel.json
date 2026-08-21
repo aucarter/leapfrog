@@ -8,6 +8,7 @@
     "configs/SpConfig.json",
     "configs/HvConfig.json",
     "configs/VgConfig.json",
-    "configs/SrConfig.json"
+    "configs/SrConfig.json",
+    "configs/EnConfig.json"
   ]
 }
