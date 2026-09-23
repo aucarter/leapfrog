@@ -844,6 +844,10 @@ type
   private
     srInfectedClass: PDouble;
     srInfectedClassLength: Integer;
+    srArtInitRateHts: PDouble;
+    srArtInitRateHtsLength: Integer;
+    srHcArtInitRate: PDouble;
+    srHcArtInitRateLength: Integer;
     srArtInitHts: PDouble;
     srArtInitHtsLength: Integer;
 end;
@@ -852,6 +856,8 @@ type
   LeapfrogSexualRiskState = class
   public
     srInfectedClass: TGBFixedArray<Double>;
+    srArtInitRateHts: TGBFixedArray<Double>;
+    srHcArtInitRate: TGBFixedArray<Double>;
     srArtInitHts: TGBFixedArray<Double>;
     function getView(): LeapfrogSexualRiskStateView;
     procedure writeToDisk(dir: string);
@@ -1610,6 +1616,8 @@ end;
 destructor LeapfrogSexualRiskState.Destroy;
 begin;
   srInfectedClass.Free;
+  srArtInitRateHts.Free;
+  srHcArtInitRate.Free;
   srArtInitHts.Free;
   inherited;
 end;
@@ -1640,6 +1648,10 @@ function LeapfrogSexualRiskState.getView(): LeapfrogSexualRiskStateView;
 begin;
   Result.srInfectedClass := PDouble(srInfectedClass.data);
   Result.srInfectedClassLength := srInfectedClass.GetLength();
+  Result.srArtInitRateHts := PDouble(srArtInitRateHts.data);
+  Result.srArtInitRateHtsLength := srArtInitRateHts.GetLength();
+  Result.srHcArtInitRate := PDouble(srHcArtInitRate.data);
+  Result.srHcArtInitRateLength := srHcArtInitRate.GetLength();
   Result.srArtInitHts := PDouble(srArtInitHts.data);
   Result.srArtInitHtsLength := srArtInitHts.GetLength();
 end;
@@ -1896,6 +1908,8 @@ begin;
   if not DirectoryExists(dir) then
     ForceDirectories(dir);
   srInfectedClass.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectedClass');
+  srArtInitRateHts.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitRateHts');
+  srHcArtInitRate.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srHcArtInitRate');
   srArtInitHts.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitHts');
 end;
 

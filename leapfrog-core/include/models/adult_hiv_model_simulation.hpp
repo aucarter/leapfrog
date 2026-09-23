@@ -808,15 +808,20 @@ struct AdultHivModelSimulation<Config> {
 
       // ART initiation replay (HivStructuralRate only). sr_art_init_mode 0
       // derives initiations from the ART target exactly as below and records
-      // them per HIV step in sr_art_init_hts; mode 1 ignores the target and
-      // replays sr_art_init_replay instead. With replay, initiation no longer
-      // back-fills a target, so it can be switched independently of ART
-      // dropout (maintenance) -- the sequential decomposition of initiation vs
-      // maintenance. Replaying a mode-0 record reproduces that run exactly.
+      // them per HIV step, as counts (sr_art_init_hts) and as rates of the
+      // available untreated pool (sr_art_init_rate_hts). Mode 1 ignores the
+      // target and replays sr_art_init_replay as COUNTS; mode 2 replays it as
+      // RATES of the pool, so initiations scale with the scenario's own need
+      // (coverage space, for decomposition counterfactuals). Either way
+      // initiation no longer back-fills a target, so it can be switched
+      // independently of ART dropout (maintenance). Replaying a mode-0 record
+      // reproduces that run (mode 1 exactly, mode 2 to rounding).
       if constexpr (ModelVariant::run_sr) {
         for (int ha = 0; ha < hAG; ++ha)
-          for (int hm = 0; hm < hDS; ++hm)
+          for (int hm = 0; hm < hDS; ++hm) {
             state_next.sr.sr_art_init_hts(hm, ha, s, hiv_step) = 0.0;
+            state_next.sr.sr_art_init_rate_hts(hm, ha, s, hiv_step) = 0.0;
+          }
       }
 
       // Step 2: within CD4 category, allocate ART by age proportional to
@@ -824,11 +829,12 @@ struct AdultHivModelSimulation<Config> {
       for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
         for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
           bool replayed = false;
+          const auto pool = n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s);
           if constexpr (ModelVariant::run_sr) {
-            if (pars.sr.sr_art_init_mode == 1) {
-              i_ha.artinit_hahm = std::min(pars.sr.sr_art_init_replay(hm, ha, s, hiv_step, t),
-                                          n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s));
-              i_ha.artinit_hahm = std::max(i_ha.artinit_hahm, 0.0);
+            const int mode = pars.sr.sr_art_init_mode;
+            if (mode == 1 || mode == 2) {
+              const auto x = pars.sr.sr_art_init_replay(hm, ha, s, hiv_step, t);
+              i_ha.artinit_hahm = std::max(std::min(mode == 1 ? x : x * pool, pool), 0.0);
               replayed = true;
             }
           }
@@ -844,8 +850,11 @@ struct AdultHivModelSimulation<Config> {
           i_ha.grad(hm, ha, s) -= i_ha.artinit_hahm / opts.dt;
           i_ha.gradART(ART0MOS, hm, ha, s) += i_ha.artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += i_ha.artinit_hahm;
-          if constexpr (ModelVariant::run_sr)
+          if constexpr (ModelVariant::run_sr) {
             state_next.sr.sr_art_init_hts(hm, ha, s, hiv_step) = i_ha.artinit_hahm;
+            state_next.sr.sr_art_init_rate_hts(hm, ha, s, hiv_step) =
+              pool > 0.0 ? i_ha.artinit_hahm / pool : 0.0;
+          }
         }
       }
     }

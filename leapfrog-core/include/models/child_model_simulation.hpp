@@ -1341,16 +1341,19 @@ struct ChildModelSimulation<Config> {
       n_hc.hc_art_init(ag) = std::max(i_hc.hc_art_deaths(ag) + average_art_by_year - i_hc.on_art(ag) * i_hc.retained, 0.0);
       n_hc.hc_art_init(ag) = std::min(n_hc.hc_art_init(ag),
                                       i_hc.unmet_need(ag) + i_hc.on_art(ag) * p_hc.hc_art_ltfu(t));
-      // ART initiation replay (HivStructuralRate, sr_art_init_mode 1): take
-      // this year's initiations from sr_hc_art_init_replay instead of from the
-      // target, under the same availability cap, so child initiation cannot
-      // back-fill losses to follow-up. hc_art_init is the record to replay.
+      // ART initiation replay (HivStructuralRate): mode 1 takes this year's
+      // initiations from sr_hc_art_init_replay as COUNTS, mode 2 as RATES of
+      // the same availability pool, instead of from the target, so child
+      // initiation cannot back-fill losses to follow-up. hc_art_init is the
+      // count record; sr_hc_art_init_rate the rate record.
       if constexpr (ModelVariant::run_sr) {
-        if (pars.sr.sr_art_init_mode == 1) {
-          n_hc.hc_art_init(ag) = std::max(std::min(pars.sr.sr_hc_art_init_replay(ag, t),
-                                                   i_hc.unmet_need(ag) + i_hc.on_art(ag) * p_hc.hc_art_ltfu(t)),
-                                          0.0);
+        const auto pool = i_hc.unmet_need(ag) + i_hc.on_art(ag) * p_hc.hc_art_ltfu(t);
+        const int mode = pars.sr.sr_art_init_mode;
+        if (mode == 1 || mode == 2) {
+          const auto x = pars.sr.sr_hc_art_init_replay(ag, t);
+          n_hc.hc_art_init(ag) = std::max(std::min(mode == 1 ? x : x * pool, pool), 0.0);
         }
+        state_next.sr.sr_hc_art_init_rate(ag) = pool > 0.0 ? n_hc.hc_art_init(ag) / pool : 0.0;
       }
     } // end ag
   };
