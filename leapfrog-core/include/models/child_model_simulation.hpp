@@ -1397,6 +1397,17 @@ struct ChildModelSimulation<Config> {
         n_hc.hc_art_init(ag) = std::max(i_hc.hc_art_deaths(ag) + average_art_by_year - i_hc.on_art(ag) * retained, 0.0);
         n_hc.hc_art_init(ag) = std::min(n_hc.hc_art_init(ag),
                                         i_hc.unmet_need(ag) + i_hc.on_art(ag) * p_hc.hc_art_ltfu(t));
+        // ART initiation replay (HivStructuralRate, sr_art_init_mode 1): take
+        // this year's initiations from sr_hc_art_init_replay instead of from the
+        // target, under the same availability cap, so child initiation cannot
+        // back-fill losses to follow-up. hc_art_init is the record to replay.
+        if constexpr (ModelVariant::run_sr) {
+          if (pars.sr.sr_art_init_mode == 1) {
+            n_hc.hc_art_init(ag) = std::max(std::min(pars.sr.sr_hc_art_init_replay(ag, t),
+                                                     i_hc.unmet_need(ag) + i_hc.on_art(ag) * p_hc.hc_art_ltfu(t)),
+                                            0.0);
+          }
+        }
       } // end ag
     } else {
       real_type art_deaths_total = 0.0, on_art_total = 0.0, unmet_need_total = 0.0;
@@ -1409,6 +1420,17 @@ struct ChildModelSimulation<Config> {
       n_hc.hc_art_init_total = std::max(art_deaths_total + average_art_by_year - on_art_total * retained, 0.0);
       n_hc.hc_art_init_total = std::min(n_hc.hc_art_init_total,
                                         unmet_need_total + on_art_total * p_hc.hc_art_ltfu(t));
+      // Replay as above; with ART not age-specific the record is the total,
+      // which the replay array carries as its sum over age groups.
+      if constexpr (ModelVariant::run_sr) {
+        if (pars.sr.sr_art_init_mode == 1) {
+          real_type replay_total = 0.0;
+          for (int ag = 0; ag < hcAG_c; ++ag) replay_total += pars.sr.sr_hc_art_init_replay(ag, t);
+          n_hc.hc_art_init_total = std::max(std::min(replay_total,
+                                                     unmet_need_total + on_art_total * p_hc.hc_art_ltfu(t)),
+                                            0.0);
+        }
+      }
     }
   };
 

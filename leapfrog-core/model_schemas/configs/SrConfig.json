@@ -37,6 +37,10 @@
     "sr_art_init_mode": {
       "num_type": "int"
     },
+    "sr_hc_art_init_replay": {
+      "num_type": "real_type",
+      "dims": ["SS::hcAG_coarse", "opts.proj_steps"]
+    },
     "sr_art_init_replay": {
       "num_type": "real_type",
       "dims": ["SS::hDS", "SS::hAG", "SS::NS", "SS::HIV_STEPS_PER_YEAR", "opts.proj_steps"]
