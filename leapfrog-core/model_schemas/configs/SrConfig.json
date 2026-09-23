@@ -33,6 +33,13 @@
     "sr_kp_intervention_mult": {
       "num_type": "real_type",
       "dims": ["SS::pAG", "SS::NS", "SS::NKP", "opts.proj_steps"]
+    },
+    "sr_art_init_mode": {
+      "num_type": "int"
+    },
+    "sr_art_init_replay": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::hAG", "SS::NS", "SS::HIV_STEPS_PER_YEAR", "opts.proj_steps"]
     }
   },
   "intermediate": {},
@@ -40,6 +47,10 @@
     "sr_infected_class": {
       "num_type": "real_type",
       "dims": ["SS::NS", "SS::NCLASS"]
+    },
+    "sr_art_init_hts": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::hAG", "SS::NS", "SS::HIV_STEPS_PER_YEAR"]
     }
   }
 }

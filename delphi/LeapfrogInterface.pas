@@ -813,6 +813,10 @@ type
     srKpIrrLength: Integer;
     srKpInterventionMult: PDouble;
     srKpInterventionMultLength: Integer;
+    srArtInitMode: Integer;
+    srArtInitModeLength: Integer;
+    srArtInitReplay: PDouble;
+    srArtInitReplayLength: Integer;
 end;
 
 type
@@ -824,6 +828,8 @@ type
     srKpProp: TGBFixedArray<Double>;
     srKpIrr: TGBFixedArray<Double>;
     srKpInterventionMult: TGBFixedArray<Double>;
+    srArtInitMode: Integer;
+    srArtInitReplay: TGBFixedArray<Double>;
     function getView(): LeapfrogSexualRiskParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -835,12 +841,15 @@ type
   private
     srInfectedClass: PDouble;
     srInfectedClassLength: Integer;
+    srArtInitHts: PDouble;
+    srArtInitHtsLength: Integer;
 end;
 
 type
   LeapfrogSexualRiskState = class
   public
     srInfectedClass: TGBFixedArray<Double>;
+    srArtInitHts: TGBFixedArray<Double>;
     function getView(): LeapfrogSexualRiskStateView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1590,12 +1599,14 @@ begin;
   srKpProp.Free;
   srKpIrr.Free;
   srKpInterventionMult.Free;
+  srArtInitReplay.Free;
   inherited;
 end;
 
 destructor LeapfrogSexualRiskState.Destroy;
 begin;
   srInfectedClass.Free;
+  srArtInitHts.Free;
   inherited;
 end;
 
@@ -1613,12 +1624,18 @@ begin;
   Result.srKpIrrLength := srKpIrr.GetLength();
   Result.srKpInterventionMult := PDouble(srKpInterventionMult.data);
   Result.srKpInterventionMultLength := srKpInterventionMult.GetLength();
+  Result.srArtInitMode := srArtInitMode;
+  Result.srArtInitModeLength := 1;
+  Result.srArtInitReplay := PDouble(srArtInitReplay.data);
+  Result.srArtInitReplayLength := srArtInitReplay.GetLength();
 end;
 
 function LeapfrogSexualRiskState.getView(): LeapfrogSexualRiskStateView;
 begin;
   Result.srInfectedClass := PDouble(srInfectedClass.data);
   Result.srInfectedClassLength := srInfectedClass.GetLength();
+  Result.srArtInitHts := PDouble(srArtInitHts.data);
+  Result.srArtInitHtsLength := srArtInitHts.GetLength();
 end;
 
 procedure LeapfrogDemProjParams.writeToDisk(dir: string);
@@ -1864,6 +1881,7 @@ begin;
   srKpProp.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpProp');
   srKpIrr.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpIrr');
   srKpInterventionMult.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srKpInterventionMult');
+  srArtInitReplay.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitReplay');
 end;
 
 procedure LeapfrogSexualRiskState.writeToDisk(dir: string);
@@ -1871,6 +1889,7 @@ begin;
   if not DirectoryExists(dir) then
     ForceDirectories(dir);
   srInfectedClass.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectedClass');
+  srArtInitHts.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitHts');
 end;
 
 procedure LeapfrogParams.SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
