@@ -143,6 +143,11 @@ process_parameters_to_cpp <- function(parameters) {
            length(parameters[["art_dropout_rate"]])))
   }
 
+  if ("sr_intervention_mult" %in% names(parameters) &&
+      is.null(parameters[["sr_hc_art_init_replay"]])) {
+    parameters[["sr_hc_art_init_replay"]] <- array(0, dim(parameters[["hc_art_val"]]))
+  }
+
   parameters
 }
 
