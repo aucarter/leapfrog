@@ -760,7 +760,7 @@ struct AdultHivModelSimulation<Config> {
       // 1. Allocate by CD4 category (weighted by 'eligible' and 'expected mortality')
       // 2. Allocate by age groups (weighted only by eligibility)
       allocate_art_initiation_by_cd4();
-      allocate_art_initiation_by_age(s);
+      allocate_art_initiation_by_age(s, hiv_step);
     }
   };
 
@@ -914,23 +914,49 @@ struct AdultHivModelSimulation<Config> {
 
   // Step 2: within CD4 stage, allocate ART initiations by age proportional to
   // eligibility, capped by the population actually available to initiate
-  void allocate_art_initiation_by_age(int s) {
+  void allocate_art_initiation_by_age(int s, int hiv_step) {
     auto& n_ha = state_next.ha;
     auto& i_ha = intermediate.ha;
 
+    // ART initiation replay (HivStructuralRate only). sr_art_init_mode 0
+    // derives initiations from the ART target exactly as below and records
+    // them per HIV step in sr_art_init_hts; mode 1 ignores the target and
+    // replays sr_art_init_replay instead. With replay, initiation no longer
+    // back-fills a target, so it can be switched independently of ART
+    // dropout (maintenance) -- the sequential decomposition of initiation vs
+    // maintenance. Replaying a mode-0 record reproduces that run exactly.
+    if constexpr (ModelVariant::run_sr) {
+      for (int ha = 0; ha < hAG; ++ha)
+        for (int hm = 0; hm < hDS; ++hm)
+          state_next.sr.sr_art_init_hts(hm, ha, s, hiv_step) = 0.0;
+    }
+
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-        if (i_ha.artelig_hm(hm) > 0.0) {
-          real_type artinit_hahm = i_ha.artinit_hm(hm) *
-                                   i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) /
-                                   i_ha.artelig_hm(hm);
+        real_type artinit_hahm = 0.0;
+        bool replayed = false;
+        if constexpr (ModelVariant::run_sr) {
+          if (pars.sr.sr_art_init_mode == 1) {
+            artinit_hahm = std::min(pars.sr.sr_art_init_replay(hm, ha, s, hiv_step, t),
+                                    n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s));
+            artinit_hahm = std::max(artinit_hahm, 0.0);
+            replayed = true;
+          }
+        }
+        if (!replayed) {
+          if (!(i_ha.artelig_hm(hm) > 0.0)) continue;
+          artinit_hahm = i_ha.artinit_hm(hm) *
+                         i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) /
+                         i_ha.artelig_hm(hm);
           artinit_hahm = std::min(artinit_hahm, i_ha.artelig_hahm(hm, ha - hIDX_15PLUS));
           artinit_hahm = std::min(artinit_hahm,
                                   n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s));
-          i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
-          i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
-          n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
         }
+        i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
+        i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
+        n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
+        if constexpr (ModelVariant::run_sr)
+          state_next.sr.sr_art_init_hts(hm, ha, s, hiv_step) = artinit_hahm;
       }
     }
   };

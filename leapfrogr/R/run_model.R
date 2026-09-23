@@ -128,6 +128,21 @@ process_parameters_to_cpp <- function(parameters) {
     parameters[["hts_per_year"]] <- 10L
   }
 
+  # HivStructuralRate ART initiation replay: default to target-driven
+  # initiation (mode 0) so bundles built before the option existed run
+  # unchanged. The replay array is only read in mode 1.
+  if ("sr_intervention_mult" %in% names(parameters) &&
+      is.null(parameters[["sr_art_init_mode"]])) {
+    parameters[["sr_art_init_mode"]] <- 0L
+  }
+  if ("sr_intervention_mult" %in% names(parameters) &&
+      is.null(parameters[["sr_art_init_replay"]])) {
+    dm <- dim(parameters[["art_mort"]])          # hTS x hDS x hAG x NS
+    parameters[["sr_art_init_replay"]] <- array(
+      0, c(dm[[2]], dm[[3]], dm[[4]], parameters[["hts_per_year"]],
+           length(parameters[["art_dropout_rate"]])))
+  }
+
   parameters
 }
 
