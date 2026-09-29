@@ -423,6 +423,18 @@ struct AdultHivModelSimulation<Config> {
     //    blow-up an unbounded multiplicative rescale would cause as the class
     //    headcount collapses). Fall back to contact-weighted shares when the
     //    headcount has effectively vanished.
+    //    sr_class_memory 1 carries the class headcount over from the end of
+    //    the previous year; 0 (default) starts each year from the zeroed state,
+    //    i.e. from the fallback below weighted by contact rate alone, ignoring
+    //    class sizes. State is reset every year, so without the carry the class
+    //    composition of the infected only evolves within a year, and splitting
+    //    a class changes the pool even at equal contact rates. Use mode 1 with
+    //    the non-regular partner-count split.
+    if (p_sr.sr_class_memory == 1 && hiv_step == 0) {
+      for (int s = 0; s < NS; ++s)
+        for (int g = 0; g < NCLASS; ++g)
+          n_sr.sr_infected_class(s, g) = state_curr.sr.sr_infected_class(s, g);
+    }
     constexpr real_type kMinIg = 1e-8;
     for (int s = 0; s < NS; ++s) {
       real_type hivpos_s = 0.0;
@@ -433,11 +445,29 @@ struct AdultHivModelSimulation<Config> {
         for (int g = 0; g < NCLASS; ++g)
           n_sr.sr_infected_class(s, g) = (n_sr.sr_infected_class(s, g) / sumIg) * hivpos_s;
       } else {
+        // Fallback shares: contact rate alone (mode 0), or contact rate x
+        // class size among susceptibles (mode 1), the composition new
+        // infections take, so splitting a class into sub-classes of equal
+        // contact rate leaves the pool unchanged.
+        real_type w[NCLASS];
+        for (int g = 0; g < NCLASS; ++g) {
+          w[g] = p_sr.sr_contact_rate(g);
+          if (p_sr.sr_class_memory == 1) {
+            real_type Sg = 0.0;
+            for (int a = a_lo; a < a_hi; ++a) {
+              real_type qtot = 0.0;
+              for (int k = 0; k < NKP; ++k) qtot += p_sr.sr_kp_prop(a, s, k, t);
+              if (qtot > 1.0) qtot = 1.0;
+              Sg += p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * atrisk_hivn[a][s];
+            }
+            w[g] *= Sg;
+          }
+        }
         real_type csum = 0.0;
-        for (int g = 0; g < NCLASS; ++g) csum += p_sr.sr_contact_rate(g);
+        for (int g = 0; g < NCLASS; ++g) csum += w[g];
         for (int g = 0; g < NCLASS; ++g)
           n_sr.sr_infected_class(s, g) = csum > 0.0
-            ? (p_sr.sr_contact_rate(g) / csum) * hivpos_s
+            ? (w[g] / csum) * hivpos_s
             : hivpos_s / NCLASS;
       }
     }
@@ -500,6 +530,7 @@ struct AdultHivModelSimulation<Config> {
           real_type inf = lambda * Sg;
           if (seeding) inf += p_ha.initial_incidence * Sg;     // epidemic seed
           i_ha.p_infections_ts(a, s) += inf;
+          n_sr.sr_infections_class(s, g) += opts.dt * inf;
           inf_gen_as += inf;
           Sg_as += Sg;
           if (a >= a_lo && a < a_hi) newinf_class[s][g] += inf;
@@ -509,8 +540,10 @@ struct AdultHivModelSimulation<Config> {
         const real_type lam_bar = Sg_as > 0.0 ? inf_gen_as / Sg_as : 0.0;
         for (int k = 0; k < NKP; ++k) {
           const real_type Skp = p_sr.sr_kp_prop(a, s, k, t) * hivn;
-          i_ha.p_infections_ts(a, s) += p_sr.sr_kp_irr(k, t) * lam_bar *
-                                        p_sr.sr_kp_intervention_mult(a, s, k, t) * Skp;
+          const real_type inf_kp = p_sr.sr_kp_irr(k, t) * lam_bar *
+                                   p_sr.sr_kp_intervention_mult(a, s, k, t) * Skp;
+          i_ha.p_infections_ts(a, s) += inf_kp;
+          n_sr.sr_infections_kp(s, k) += opts.dt * inf_kp;
         }
       }
     }

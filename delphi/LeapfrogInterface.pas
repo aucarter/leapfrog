@@ -815,6 +815,8 @@ type
     srKpInterventionMultLength: Integer;
     srArtInitMode: Integer;
     srArtInitModeLength: Integer;
+    srClassMemory: Integer;
+    srClassMemoryLength: Integer;
     srHcArtInitReplay: PDouble;
     srHcArtInitReplayLength: Integer;
     srArtInitReplay: PDouble;
@@ -831,6 +833,7 @@ type
     srKpIrr: TGBFixedArray<Double>;
     srKpInterventionMult: TGBFixedArray<Double>;
     srArtInitMode: Integer;
+    srClassMemory: Integer;
     srHcArtInitReplay: TGBFixedArray<Double>;
     srArtInitReplay: TGBFixedArray<Double>;
     function getView(): LeapfrogSexualRiskParamsView;
@@ -844,6 +847,10 @@ type
   private
     srInfectedClass: PDouble;
     srInfectedClassLength: Integer;
+    srInfectionsClass: PDouble;
+    srInfectionsClassLength: Integer;
+    srInfectionsKp: PDouble;
+    srInfectionsKpLength: Integer;
     srArtInitRateHts: PDouble;
     srArtInitRateHtsLength: Integer;
     srHcArtInitRate: PDouble;
@@ -856,6 +863,8 @@ type
   LeapfrogSexualRiskState = class
   public
     srInfectedClass: TGBFixedArray<Double>;
+    srInfectionsClass: TGBFixedArray<Double>;
+    srInfectionsKp: TGBFixedArray<Double>;
     srArtInitRateHts: TGBFixedArray<Double>;
     srHcArtInitRate: TGBFixedArray<Double>;
     srArtInitHts: TGBFixedArray<Double>;
@@ -1616,6 +1625,8 @@ end;
 destructor LeapfrogSexualRiskState.Destroy;
 begin;
   srInfectedClass.Free;
+  srInfectionsClass.Free;
+  srInfectionsKp.Free;
   srArtInitRateHts.Free;
   srHcArtInitRate.Free;
   srArtInitHts.Free;
@@ -1638,6 +1649,8 @@ begin;
   Result.srKpInterventionMultLength := srKpInterventionMult.GetLength();
   Result.srArtInitMode := srArtInitMode;
   Result.srArtInitModeLength := 1;
+  Result.srClassMemory := srClassMemory;
+  Result.srClassMemoryLength := 1;
   Result.srHcArtInitReplay := PDouble(srHcArtInitReplay.data);
   Result.srHcArtInitReplayLength := srHcArtInitReplay.GetLength();
   Result.srArtInitReplay := PDouble(srArtInitReplay.data);
@@ -1648,6 +1661,10 @@ function LeapfrogSexualRiskState.getView(): LeapfrogSexualRiskStateView;
 begin;
   Result.srInfectedClass := PDouble(srInfectedClass.data);
   Result.srInfectedClassLength := srInfectedClass.GetLength();
+  Result.srInfectionsClass := PDouble(srInfectionsClass.data);
+  Result.srInfectionsClassLength := srInfectionsClass.GetLength();
+  Result.srInfectionsKp := PDouble(srInfectionsKp.data);
+  Result.srInfectionsKpLength := srInfectionsKp.GetLength();
   Result.srArtInitRateHts := PDouble(srArtInitRateHts.data);
   Result.srArtInitRateHtsLength := srArtInitRateHts.GetLength();
   Result.srHcArtInitRate := PDouble(srHcArtInitRate.data);
@@ -1908,6 +1925,8 @@ begin;
   if not DirectoryExists(dir) then
     ForceDirectories(dir);
   srInfectedClass.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectedClass');
+  srInfectionsClass.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectionsClass');
+  srInfectionsKp.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srInfectionsKp');
   srArtInitRateHts.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitRateHts');
   srHcArtInitRate.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srHcArtInitRate');
   srArtInitHts.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'srArtInitHts');

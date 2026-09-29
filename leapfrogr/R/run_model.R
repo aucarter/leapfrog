@@ -148,6 +148,31 @@ process_parameters_to_cpp <- function(parameters) {
     parameters[["sr_hc_art_init_replay"]] <- array(0, dim(parameters[["hc_art_val"]]))
   }
 
+  # The class dimension holds 5 classes (no sex, one cohabiting partner, and
+  # non-regular partners split 1 / 2 / 3+). A 3-class bundle (non-regular as one
+  # class) is padded with empty classes of zero contact rate, which add exactly
+  # zero to every sum, so it runs unchanged.
+  if ("sr_intervention_mult" %in% names(parameters)) {
+    parameters <- pad_sr_classes(parameters, 5L)
+    if (is.null(parameters[["sr_class_memory"]])) parameters[["sr_class_memory"]] <- 0L
+  }
+
+  parameters
+}
+
+pad_sr_classes <- function(parameters, nclass) {
+  have <- length(parameters[["sr_contact_rate"]])
+  if (have == nclass) return(parameters)
+  if (have > nclass) stop("sr_contact_rate has ", have, " classes; the engine holds ", nclass)
+  pad <- nclass - have
+  parameters[["sr_contact_rate"]] <- c(as.numeric(parameters[["sr_contact_rate"]]), rep(0, pad))
+  for (nm in c("sr_class_prop", "sr_intervention_mult")) {
+    x <- parameters[[nm]]
+    d <- dim(x)
+    out <- array(if (nm == "sr_intervention_mult") 1 else 0, c(d[1:2], nclass, d[4]))
+    out[, , seq_len(have), ] <- x
+    parameters[[nm]] <- out
+  }
   parameters
 }
 
