@@ -10,6 +10,17 @@ jobs:
   model-outputs:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each entry exercises a distinct model-configuration shape so the
+        # R/Python/C++ exact-equality check below catches adapter/marshalling
+        # bugs a single fixture can't (ticket 18). The PJNZ file backing each
+        # scenario is resolved by the "Select cross-interface fixture" step
+        # via ticket 16's classifier tags, not hand-listed here -- see
+        # leapfrog-validate/src/leapfrog_validate/select_fixtures.py.
+        scenario: [baseline, coarse, pmtct_child]
+
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
@@ -44,17 +55,28 @@ jobs:
         run: |
           R CMD INSTALL .
 
-      - name: R Model Output
-        shell: bash
-        working-directory: leapfrogr
-        run: |
-          ./scripts/create_model_output.R ../model-outputs
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          cache-dependency-glob: "leapfrog-py/uv.lock"
+          cache-dependency-glob: |
+            leapfrog-py/uv.lock
+            leapfrog-validate/uv.lock
+
+      - name: Select cross-interface fixture
+        id: select
+        shell: bash
+        working-directory: leapfrog-validate
+        run: |
+          uv sync
+          r_library="$(Rscript -e 'cat(.libPaths()[1])')"
+          uv run python -m leapfrog_validate.select_fixtures "${{ matrix.scenario }}" --r-library "$r_library" >> "$GITHUB_OUTPUT"
+
+      - name: R Model Output
+        shell: bash
+        working-directory: leapfrogr
+        run: |
+          ./scripts/create_model_output.R "${{ steps.select.outputs.PARAMS_H5 }}" "${{ steps.select.outputs.CONFIGURATION }}" ../model-outputs
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -70,7 +92,7 @@ jobs:
         shell: bash
         working-directory: leapfrog-py
         run: |
-          uv run ./scripts/create_model_output.py ../model-outputs
+          uv run ./scripts/create_model_output.py "${{ steps.select.outputs.PARAMS_H5 }}" "${{ steps.select.outputs.CONFIGURATION }}" ../model-outputs
 
       - name: Install hdf5 and compile standalone model
         shell: bash
@@ -84,7 +106,7 @@ jobs:
         shell: bash
         working-directory: cpp_interface
         run: |
-          ./build/simulate_model 61 ../leapfrogr/tests/testthat/testdata/adult_parms_full.h5 ../model-outputs
+          ./build/simulate_model 61 "../leapfrogr/tests/testthat/testdata/${{ steps.select.outputs.PARAMS_H5 }}" ../model-outputs "${{ steps.select.outputs.CONFIGURATION }}"
 
       - name: Check equality
         shell: bash

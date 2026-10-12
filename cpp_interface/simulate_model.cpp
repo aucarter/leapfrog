@@ -3,16 +3,105 @@
 #include <iostream>
 #include <filesystem>
 #include <vector>
+#include <string>
 #include <string_view>
 #include <numeric>
+#include <sstream>
+#include <stdexcept>
 
 #include "leapfrog.hpp"
 #include "generated/cpp_interface/cpp_adapters.hpp"
 
+namespace {
+
+// Kept deliberately small: just the ModelVariants this binary actually
+// needs for the cross-interface (R/Python/C++) equality check's
+// shape-diverse scenarios (ticket 18) -- HivFullAgeStratification (the
+// original default), HivCoarseAgeStratification (the coarse-age-groups
+// scenario) and Spectrum (the PMTCT/child-params scenario, the smallest
+// ModelVariant that actually exercises the child-model pars adapter).
+// Mirrors the string-dispatch pattern leapfrog-py/src/main.cpp and
+// leapfrogr/src/leapfrog.cpp already use for the same purpose.
+std::vector<std::string> supported_configurations() {
+  return {"HivFullAgeStratification", "HivCoarseAgeStratification", "Spectrum"};
+}
+
+template<typename ModelVariant>
+void simulate_and_write(
+  const std::filesystem::path& params_abs,
+  std::filesystem::path output_file,
+  const std::vector<int>& output_years,
+  size_t n_runs
+) {
+  using LF = leapfrog::Leapfrog<leapfrog::Cpp, double, ModelVariant>;
+  using OP = leapfrog::internal::OwnedParsMixed<double, ModelVariant>;
+
+  // NOTE (pre-existing, not introduced by ticket 18, but now load-bearing
+  // for 3 fixtures instead of 1): hts_per_year/t_ART_start/the projection
+  // start year/period are hardcoded here rather than read from the params
+  // file the way R's get_opts_r and Python's get_opts_py do from their
+  // `parameters` list/dict. A runtime cross-check against the params file
+  // was considered and deliberately not added: `hts_per_year` isn't
+  // actually present as a stored scalar in any of this repo's real params
+  // fixtures (process_pjnz() returns it as NULL, so R's save_datasets()
+  // drops it), so reading it back would throw rather than validate
+  // anything. Confirmed empirically (not just assumed) that all three of
+  // this binary's supported configurations' real params fixtures share
+  // the same actual t_ART_start/projection_start_year/projection_period --
+  // see ticket 18's Comments for the values and how they were checked;
+  // revisit if a future fixture for this binary ever has different ones.
+  const auto opts = leapfrog::get_opts<double>(10, 30, std::string_view{"midyear"}, 1970, output_years);
+  auto owned_pars = OP::parse_pars(params_abs, opts);
+  const auto pars = LF::Cfg::get_pars(owned_pars);
+  for (size_t i = 0; i < n_runs; ++i) {
+    auto state = LF::run_model(pars, opts, output_years);
+  }
+  std::cout << "Fit complete" << std::endl;
+
+  auto state = LF::run_model(pars, opts, output_years);
+
+  const H5std_string FILE_NAME(output_file);
+  H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
+  file.close();
+
+  LF::Cfg::build_output(0, state, output_file);
+}
+
+void run_configuration(
+  const std::string& configuration,
+  const std::filesystem::path& params_abs,
+  const std::filesystem::path& output_file,
+  const std::vector<int>& output_years,
+  size_t n_runs
+) {
+  if (configuration == "HivFullAgeStratification") {
+    simulate_and_write<leapfrog::HivFullAgeStratification>(params_abs, output_file, output_years, n_runs);
+  } else if (configuration == "HivCoarseAgeStratification") {
+    simulate_and_write<leapfrog::HivCoarseAgeStratification>(params_abs, output_file, output_years, n_runs);
+  } else if (configuration == "Spectrum") {
+    simulate_and_write<leapfrog::Spectrum>(params_abs, output_file, output_years, n_runs);
+  } else {
+    const auto available = supported_configurations();
+    std::ostringstream oss;
+    oss << "Invalid configuration: '" << configuration << "'. It must be one of: ";
+    for (size_t i = 0; i < available.size(); ++i) {
+      oss << "'" << available[i] << "'";
+      if (i != available.size() - 1) {
+        oss << ", ";
+      } else {
+        oss << ".";
+      }
+    }
+    throw std::runtime_error(oss.str());
+  }
+}
+
+}  // namespace
+
 int main(int argc, char* argv[]) {
   if (argc < 4) {
     std::cout <<
-              "Usage: simulate_model <sim_years> <params_file> <output_dir>"
+              "Usage: simulate_model <sim_years> <params_file> <output_dir> [configuration]"
               <<
               std::endl;
     return 1;
@@ -21,6 +110,7 @@ int main(int argc, char* argv[]) {
   int sim_years = atoi(argv[1]);
   std::string params_file = argv[2];
   std::string output_dir = argv[3];
+  std::string configuration = argc > 4 ? argv[4] : "HivFullAgeStratification";
 
   std::filesystem::path params_abs = std::filesystem::absolute(params_file);
   if (!std::filesystem::exists(params_abs)) {
@@ -62,25 +152,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Running model fit " << n_runs << " times" << std::endl;
   }
 
-  using LF = leapfrog::Leapfrog<leapfrog::Cpp, double, leapfrog::HivFullAgeStratification>;
-  using OP = leapfrog::internal::OwnedParsMixed<double, leapfrog::HivFullAgeStratification>;
-
-  const auto opts = leapfrog::get_opts<double>(10, 30, std::string_view{"midyear"}, 1970, output_years);
-  auto owned_pars = OP::parse_pars(params_abs, opts);
-  const auto pars = LF::Cfg::get_pars(owned_pars);
-  for (size_t i = 0; i < n_runs; ++i) {
-    auto state = LF::run_model(pars, opts, output_years);
-  }
-  std::cout << "Fit complete" << std::endl;
-
-  auto state = LF::run_model(pars, opts, output_years);
-
   std::filesystem::path output_file = output_abs / "output.h5";
-  const H5std_string FILE_NAME(output_file);
-  H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
-  file.close();
 
-  LF::Cfg::build_output(0, state, output_file);
+  try {
+    run_configuration(configuration, params_abs, output_file, output_years, n_runs);
+  } catch (const std::exception& e) {
+    std::cout << e.what() << std::endl;
+    return 1;
+  }
 
   return 0;
 }

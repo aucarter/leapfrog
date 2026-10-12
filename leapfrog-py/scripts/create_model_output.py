@@ -2,10 +2,13 @@
 
 """Run leapfrog model and save output to specified dir
 Usage:
-  run_model <output-dir>
+  run_model <params> <configuration> <output-dir>
 
 Arguments:
-  <output-dir>  Path to save output to.
+  <params>         Params h5 filename under ../leapfrogr/tests/testthat/testdata/ to run.
+  <configuration>  Model configuration to run (e.g. HivFullAgeStratification,
+                   HivCoarseAgeStratification, Spectrum).
+  <output-dir>     Path to save output to.
 
 Options:
   -h --help                  Show this screen.
@@ -19,14 +22,16 @@ from leapfrog_py import read_h5_file, run_model, save_h5_file
 
 if __name__ == "__main__":
     args = docopt(__doc__)
+    params = args["<params>"]
+    configuration = args["<configuration>"]
     output_dir = args["<output-dir>"]
 
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
     parameters = read_h5_file(
-        "../leapfrogr/tests/testthat/testdata/adult_parms_full.h5"
+        os.path.join("..", "leapfrogr", "tests", "testthat", "testdata", params)
     )
-    ret = run_model(parameters)
+    ret = run_model(parameters, configuration)
 
     save_h5_file(ret, os.path.join(output_dir, "py-output.h5"))

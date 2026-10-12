@@ -49,6 +49,10 @@ Where
 * 1st arg is number of sim years, 61 for 1970:2030 inclusive
 * 2nd arg is the path to the input data, relative to this dir
 * 3rd arg is the path to the dir where output should be saved
+* 4th arg (optional) is the model configuration to run, one of
+  `HivFullAgeStratification` (default), `HivCoarseAgeStratification` or
+  `Spectrum` -- must match the shape the params file was built with (e.g.
+  `use_coarse_age_groups = TRUE` params need `HivCoarseAgeStratification`)
 
 the output will be a hdf5 file named `output.h5` within the specified directory
 
