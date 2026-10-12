@@ -8,15 +8,19 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import pytest
 
 from leapfrog_validate.diff import Tolerance
 from leapfrog_validate.indicators import (
+    ALL,
     INDICATORS,
+    Scope,
     extract_aids_deaths_on_treatment,
     extract_aids_deaths_single_age,
     extract_hiv_population,
     extract_total_population,
     extract_treatment_population,
+    tag,
 )
 
 
@@ -102,8 +106,48 @@ def test_every_indicator_shares_the_common_registry_shape():
         assert callable(spec["extract"])
         assert isinstance(spec["tolerance"], Tolerance)
         assert isinstance(spec["exclusions"], tuple)
+        assert isinstance(spec["scope"], Scope)
 
 
 def test_rtol_is_uniform_across_indicators():
     rtols = {spec["tolerance"].rtol for spec in INDICATORS.values()}
     assert len(rtols) == 1
+
+
+def test_all_five_blessed_indicators_default_to_scope_all():
+    """Ticket 20's Answer: the blessed five keep today's unscoped behavior."""
+    assert all(spec["scope"] is ALL for spec in INDICATORS.values())
+
+
+class TestScope:
+    """Ticket 20's PJNZ-scope selector: which tags (from `classify.classify`) an indicator requires."""
+
+    def test_all_applies_to_any_tag_set_including_empty(self):
+        assert ALL.applies_to(frozenset())
+        assert ALL.applies_to(frozenset({"has_pmtct", "goals"}))
+
+    def test_tag_scoped_indicator_is_skipped_for_a_pjnz_without_the_tag(self):
+        scope = tag("has_pmtct")
+
+        assert not scope.applies_to(frozenset())
+        assert not scope.applies_to(frozenset({"has_cotrim", "aim_only"}))
+
+    def test_tag_scoped_indicator_runs_for_a_pjnz_with_the_tag(self):
+        scope = tag("has_pmtct")
+
+        assert scope.applies_to(frozenset({"has_pmtct"}))
+        assert scope.applies_to(frozenset({"has_pmtct", "aim_only"}))
+
+    def test_tag_with_multiple_names_requires_every_tag_present(self):
+        scope = tag("has_pmtct", "has_cotrim")
+
+        assert not scope.applies_to(frozenset({"has_pmtct"}))
+        assert scope.applies_to(frozenset({"has_pmtct", "has_cotrim"}))
+
+    def test_tag_requires_at_least_one_name(self):
+        with pytest.raises(ValueError, match="at least one"):
+            tag()
+
+    def test_scope_is_frozen_and_comparable(self):
+        assert tag("has_pmtct") == tag("has_pmtct")
+        assert tag("has_pmtct") != tag("has_cotrim")

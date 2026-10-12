@@ -82,13 +82,17 @@ def classify(
     workspace: BuildWorkspace,
     pjnz: Path,
     manifest_data: dict[str, frozenset[str]] | None = None,
+    corpus_root: Path | None = None,
 ) -> frozenset[str]:
     """Return the full tag set for `pjnz`: shape tags | domain tags | manifest tags.
 
     `manifest_data` (from `manifest.load_manifest`) covers tags that can't
     be derived from `pjnz` at all -- provenance/purpose, per ticket 09.
+    `corpus_root`, if given, is forwarded to `manifest.manifest_tags` so a
+    manifest can disambiguate two same-named PJNZ in different corpus
+    subfolders (ticket 20) -- see its docstring.
     """
     tags = shape_tags(pjnz) | domain_tags(workspace, pjnz)
     if manifest_data:
-        tags |= manifest_tags(manifest_data, pjnz)
+        tags |= manifest_tags(manifest_data, pjnz, corpus_root=corpus_root)
     return tags

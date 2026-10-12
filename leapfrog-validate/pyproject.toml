@@ -11,6 +11,14 @@ dependencies = [
     "typer>=0.12.5",
     "h5py>3.11.0",
     "numpy>1.24.4",
+    # Azure Blob corpus source for `compare` (ticket 20) -- lists/downloads
+    # PJNZ from the private corpus ticket 16 provisioned
+    # (leapfrog-validate/infra/). azure-identity's DefaultAzureCredential
+    # covers both local (`az login`) and CI (GitHub-OIDC-federated managed
+    # identity, once tickets 21/22 wire up `azure/login@v2`) auth with no
+    # static secret in either case.
+    "azure-storage-blob>=12.19.0",
+    "azure-identity>=1.15.0",
 ]
 
 [project.scripts]

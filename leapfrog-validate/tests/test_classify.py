@@ -76,3 +76,17 @@ def test_classify_without_manifest_data_omits_manifest_tags(monkeypatch):
     tags = classify.classify(Mock(), AIM_ONLY_FIXTURE)
 
     assert tags == frozenset({"aim_only"})
+
+
+def test_classify_passes_corpus_root_through_to_manifest_tags(monkeypatch, tmp_path):
+    """Ticket 20: `corpus_root` lets manifest tags disambiguate same-named corpus files."""
+    monkeypatch.setattr(classify, "domain_tags", Mock(return_value=frozenset()))
+    corpus_root = tmp_path / "corpus"
+    (corpus_root / "ETH").mkdir(parents=True)
+    nested = corpus_root / "ETH" / AIM_ONLY_FIXTURE.name
+    nested.write_bytes(AIM_ONLY_FIXTURE.read_bytes())
+    manifest_data = {f"ETH/{AIM_ONLY_FIXTURE.name}": frozenset({"eth_specific"})}
+
+    tags = classify.classify(Mock(), nested, manifest_data, corpus_root=corpus_root)
+
+    assert tags == frozenset({"aim_only", "eth_specific"})

@@ -72,3 +72,49 @@ def test_manifest_tags_looks_up_by_filename_not_full_path(tmp_path):
     tags = manifest.manifest_tags(loaded, tmp_path / "some" / "nested" / "dir" / "foo.PJNZ")
 
     assert tags == frozenset({"custom_made"})
+
+
+def test_manifest_tags_distinguishes_same_basename_in_different_corpus_subfolders(tmp_path):
+    """Ticket 16's flagged limitation, resolved here (ticket 20): corpus-relative keys.
+
+    Two files named `foo.PJNZ` in different corpus subfolders (e.g. `US/`
+    vs. `ETH/`) are indistinguishable by bare filename alone -- passing
+    `corpus_root` lets the manifest key by the corpus-relative path instead,
+    with no bare-filename entry at all to stay unambiguous between the two.
+    """
+    corpus_root = tmp_path / "corpus"
+    (corpus_root / "US").mkdir(parents=True)
+    (corpus_root / "ETH").mkdir(parents=True)
+    us_file = corpus_root / "US" / "foo.PJNZ"
+    eth_file = corpus_root / "ETH" / "foo.PJNZ"
+    us_file.touch()
+    eth_file.touch()
+    loaded = {"US/foo.PJNZ": frozenset({"us_tag"}), "ETH/foo.PJNZ": frozenset({"eth_tag"})}
+
+    assert manifest.manifest_tags(loaded, us_file, corpus_root=corpus_root) == frozenset({"us_tag"})
+    assert manifest.manifest_tags(loaded, eth_file, corpus_root=corpus_root) == frozenset({"eth_tag"})
+
+
+def test_manifest_tags_unions_bare_filename_and_corpus_relative_entries(tmp_path):
+    """Both keys, if both present, apply -- neither silently shadows the other."""
+    corpus_root = tmp_path / "corpus"
+    (corpus_root / "ETH").mkdir(parents=True)
+    nested = corpus_root / "ETH" / "foo.PJNZ"
+    nested.touch()
+    loaded = {"foo.PJNZ": frozenset({"bare_tag"}), "ETH/foo.PJNZ": frozenset({"relative_tag"})}
+
+    tags = manifest.manifest_tags(loaded, nested, corpus_root=corpus_root)
+
+    assert tags == frozenset({"bare_tag", "relative_tag"})
+
+
+def test_manifest_tags_corpus_root_is_a_no_op_when_pjnz_is_outside_it(tmp_path):
+    """A PJNZ outside `corpus_root` (e.g. a one-off file) falls back to bare-filename lookup only."""
+    corpus_root = tmp_path / "corpus"
+    corpus_root.mkdir()
+    outside = tmp_path / "elsewhere" / "foo.PJNZ"
+    outside.parent.mkdir()
+    outside.touch()
+    loaded = {"foo.PJNZ": frozenset({"bare_tag"})}
+
+    assert manifest.manifest_tags(loaded, outside, corpus_root=corpus_root) == frozenset({"bare_tag"})

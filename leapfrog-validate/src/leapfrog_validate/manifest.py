@@ -6,12 +6,12 @@ system" provenance/purpose. Everything else comes from `classify`'s zip
 peek / R import instead, so this stays deliberately small: a flat JSON
 object mapping filename -> extra tags, not a general PJNZ database.
 
-Known limitation: keyed by bare filename, not a corpus-relative path. The
-real uploaded corpus has subfolders (e.g. `.../ETH/`), so two files
-sharing a basename in different subfolders aren't distinguishable here --
-acceptable for now since manifest entries are expected to be rare, but
-worth revisiting (path-relative-to-corpus-root keys) if that collides in
-practice or when ticket 20 wires a corpus root into the CLI.
+Keyed by bare filename (`pjnz.name`) by default -- the common case, and the
+only option before corpus subfolders existed. The real uploaded corpus has
+subfolders (e.g. `.../ETH/`), where two files can share a basename;
+`manifest_tags`'s optional `corpus_root` resolves that (ticket 20) by also
+checking a corpus-relative key (e.g. `"ETH/foo.PJNZ"`), unioned with
+whatever the bare-filename key gives.
 """
 
 import json
@@ -51,6 +51,34 @@ def load_manifest(manifest_path: Path) -> dict[str, frozenset[str]]:
     return {filename: frozenset(tags) for filename, tags in raw.items()}
 
 
-def manifest_tags(manifest: dict[str, frozenset[str]], pjnz: Path) -> frozenset[str]:
-    """Look up `pjnz`'s manifest tags by filename (not full path)."""
-    return manifest.get(pjnz.name, frozenset())
+def manifest_tags(
+    manifest: dict[str, frozenset[str]],
+    pjnz: Path,
+    corpus_root: Path | None = None,
+) -> frozenset[str]:
+    """Look up `pjnz`'s manifest tags.
+
+    Always checks the bare-filename key (`pjnz.name`). If `corpus_root` is
+    given and `pjnz` lives under it, also checks the corpus-relative key
+    (POSIX-separated, e.g. `"ETH/foo.PJNZ"`) -- the two files-with-the-same-
+    basename-in-different-subfolders case a bare filename alone can't
+    distinguish (ticket 16's flagged limitation, resolved here). Tags from
+    both keys are unioned if both are present, rather than one shadowing
+    the other.
+
+    Residual ambiguity: a bare key is still string-identical to the
+    corpus-relative key of a file living at the corpus *root* (both are
+    just `"foo.PJNZ"`), so it can't itself disambiguate a root-level file
+    from a same-named one in a subfolder. Authors of colliding basenames
+    should key both files by their (distinct) corpus-relative paths and
+    skip the bare key for that name entirely.
+    """
+    tags = manifest.get(pjnz.name, frozenset())
+    if corpus_root is not None:
+        try:
+            relative_key = pjnz.resolve().relative_to(corpus_root.resolve()).as_posix()
+        except ValueError:
+            relative_key = None
+        if relative_key is not None:
+            tags |= manifest.get(relative_key, frozenset())
+    return tags
