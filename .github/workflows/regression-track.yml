@@ -1,0 +1,134 @@
+# leapfrog vs leapfrog regression (ticket 21).
+#
+# Compares a PR's head commit against `main`, under the `Spectrum`
+# ModelVariant, across the full private PJNZ corpus, at the regression
+# track's tight tolerance (see leapfrog-validate/src/leapfrog_validate/
+# indicators.py). Posts the result as a sticky, updating PR comment via
+# `leapfrog_validate.report_regression` (a plain script -- see that
+# module's docstring -- not the `leapfrog-validate compare` CLI directly,
+# so this job's own stdout never carries a raw diff magnitude).
+#
+# Gated to same-repo branches (`if:` below): a fork PR gets neither the
+# Azure OIDC token nor this job's result posted as a comment, matching
+# this repo's existing pattern of staying on plain `pull_request` rather
+# than `pull_request_target` (ticket 06's research) and
+# leapfrog-validate/infra/README.md's explicit "Fork PRs" guidance (the
+# federated credential's trust condition alone does not exclude forks;
+# this `if:` is the actual fork-safety boundary, not just belt-and-suspenders).
+#
+# This job cannot make itself a GitHub branch-protection "required status
+# check" -- that's a repo-admin setting with no workflow-YAML equivalent.
+# See this ticket's Comments (.scratch/leapfrog-validation/issues/
+# 21-regression-track-ci-blocking-comment.md) for the exact manual step a
+# repo admin needs to take, and the check name to require.
+
+name: regression-track
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  regression:
+    name: leapfrog vs leapfrog regression
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    env:
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          # `leapfrog_validate.report_regression` resolves both the PR's
+          # head SHA and `origin/main` to real commits and builds a git
+          # worktree for each -- both need to exist as real objects in
+          # this checkout's history, not just the PR ref line.
+          fetch-depth: 0
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+          extra-repositories: "https://mrc-ide.r-universe.dev https://hivtools.r-universe.dev"
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck, any::here
+          needs: check
+          working-directory: leapfrogr
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "leapfrog-validate/uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install leapfrog-validate
+        shell: bash
+        working-directory: leapfrog-validate
+        run: uv sync --all-extras --dev
+
+      - name: Resolve sticky-comment header
+        id: header
+        shell: bash
+        working-directory: leapfrog-validate
+        run: |
+          value=$(uv run python -m leapfrog_validate.report_regression --print-header)
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+        # Reads STICKY_COMMENT_HEADER straight from report_regression.py
+        # rather than hardcoding a second, independently-typed copy of the
+        # same string here -- the two would otherwise be free to drift
+        # apart silently (code review finding, ticket 21).
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run regression comparison
+        id: regression
+        shell: bash
+        continue-on-error: true
+        working-directory: leapfrog-validate
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_CONTAINER: ${{ vars.AZURE_STORAGE_CONTAINER }}
+        run: |
+          uv run python -m leapfrog_validate.report_regression \
+            --ref "${{ github.event.pull_request.head.sha }}" \
+            --candidate origin/main \
+            --azure-account "$AZURE_STORAGE_ACCOUNT" \
+            --azure-container "$AZURE_STORAGE_CONTAINER" \
+            --out "$GITHUB_WORKSPACE/regression-comment.md"
+        # Never pipe this step's own stdout/stderr anywhere a human other
+        # than a workflow-log reader would see it -- it's allowed to show
+        # progress/PASS/FAIL/filenames (see report_regression.py's
+        # docstring), just never a diff magnitude. The *comment* content
+        # is read from the file below, not from this step's console output.
+
+      - name: Post sticky comment
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: ${{ steps.header.outputs.value }}
+          path: regression-comment.md
+
+      - name: Fail the job if the regression check failed
+        if: steps.regression.outcome == 'failure'
+        shell: bash
+        run: exit 1
