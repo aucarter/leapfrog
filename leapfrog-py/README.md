@@ -26,7 +26,10 @@ parameters_child = read_h5_file("../leapfrogr/tests/testthat/testdata/child_parm
 Here are a couple of ways to run the model
 
 ```python
-from leapfrog_py import run_model
+from leapfrog_py import list_model_configurations, run_model
+
+# The available configurations, the same set as in leapfrogr
+list_model_configurations()
 
 # Default configuration is HivFullAgeStratification and output_years is range(1970, 2031)
 run_model(parameters_adult)

@@ -1,9 +1,11 @@
+import numpy as np
 from deepdiff import DeepDiff
 
 from leapfrog_py import (
     concat_on_time_dim,
     get_leapfrog_ss,
     get_time_slice,
+    list_model_configurations,
     read_h5_file,
     run_model,
     run_model_from_state,
@@ -160,3 +162,61 @@ def test_spectrum_model():
     returned_vars = list(ret.keys())
     # Just test 1 of the expected spectrum outputs is returned
     assert("p_deaths_nonaids_artpop" in returned_vars)
+
+
+def test_lists_same_configurations_as_r():
+    assert list_model_configurations() == [
+        "DemographicProjection",
+        "HivFullAgeStratification",
+        "HivCoarseAgeStratification",
+        "ChildModel",
+        "CoarseChildModel",
+        "Spectrum",
+        "GBD",
+        "GBDvirgin",
+        "HivStructuralRate",
+    ]
+
+
+def test_can_get_structural_rate_state_space():
+    ss = get_leapfrog_ss("HivStructuralRate")
+    assert ss["pAG"] == 106
+    assert ss["hAG"] == 96
+    assert ss["vAG"] == 20
+    assert ss["NCLASS"] == 5
+    assert ss["NKP"] == 3
+
+
+def test_structural_rate_model_matches_r():
+    parameters = read_h5_file("../leapfrogr/tests/testthat/testdata/sr_parms.h5")
+    expected = read_h5_file("../leapfrogr/tests/testthat/testdata/sr_r_output.h5")
+    ret = run_model(parameters, "HivStructuralRate")
+
+    assert sorted(ret.keys()) == sorted(expected.keys())
+    for name in [
+        "sr_infected_class",
+        "sr_infections_class",
+        "sr_infections_kp",
+        "p_totpop_virgin",
+        "p_hivpop_virgin",
+    ]:
+        assert name in ret
+    assert ret["sr_infections_class"].shape == (2, 5, 61)
+    assert ret["sr_infections_class"].sum() > 0
+    for name, value in expected.items():
+        np.testing.assert_allclose(ret[name], value, rtol=1e-12, atol=0, err_msg=name)
+
+
+def test_structural_rate_model_agrees_on_all_years_and_two_part_run():
+    parameters = read_h5_file("../leapfrogr/tests/testthat/testdata/sr_parms.h5")
+    ret_all_years = run_model(parameters, "HivStructuralRate")
+
+    ret_first_half = run_model(parameters, "HivStructuralRate", range(1970, 2001))
+    ret_second_half = run_model_from_state(
+        parameters,
+        "HivStructuralRate",
+        get_time_slice(ret_first_half, 30),
+        2000,
+        range(2001, 2031),
+    )
+    assert_equal(ret_all_years, concat_on_time_dim(ret_first_half, ret_second_half))

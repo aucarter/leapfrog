@@ -6,6 +6,7 @@ from h5py._hl.dataset import Dataset
 
 from leapfrog_py._core import (
     get_leapfrog_ss_py,
+    list_model_configurations_py,
     run_base_model,
     run_base_model_from_state,
     run_base_model_single_year,
@@ -89,3 +90,7 @@ def run_model_single_year(
 
 def get_leapfrog_ss(configuration: str) -> LeapfrogStateSpace:
     return get_leapfrog_ss_py(configuration)
+
+
+def list_model_configurations() -> list[str]:
+    return list_model_configurations_py()
