@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from leapfrog_validate.comment_format import code_label, details, reproduce_block
 from leapfrog_validate.spectrum_indicators import SPECTRUM_INDICATORS, SPECTRUM_RTOL
 
 # Hidden-marker convention for `marocchino/sticky-pull-request-comment`'s
@@ -163,20 +164,17 @@ def _reproduce_command(pjnz_label: str, ref_sha: str) -> str:
     )
 
 
-def _format_entry(result: PjnzResult, ref_sha: str) -> str:
+def _format_entry(result: PjnzResult, ref_sha: str) -> list[str]:
+    """Build one closed `<details>` block for a failed file: its indicator ticks/crosses, then "Reproduce this"."""
     if result.errored:
-        lines = [f"- `{result.label}` -- could not be compared: {result.error}"]
+        summary = f"{code_label(result.label)} -- could not be compared"
+        body = [f"Could not be compared: {result.error}"]
     else:
-        lines = [f"- `{result.label}` -- {result.pass_rate_label} indicators passed"]
-        for indicator in result.indicators:
-            mark = _PASS_MARK if indicator.passed else _FAIL_MARK
-            lines.append(f"  - {mark} {indicator.name}")
-    lines.append("  Reproduce:")
-    lines.append("  ```")
-    for cmd_line in _reproduce_command(result.label, ref_sha).splitlines():
-        lines.append(f"  {cmd_line}")
-    lines.append("  ```")
-    return "\n".join(lines)
+        summary = f"{code_label(result.label)} -- {result.pass_rate_label} indicators passed"
+        body = [f"- {_PASS_MARK if i.passed else _FAIL_MARK} {i.name}" for i in result.indicators]
+    body.append("")
+    body.extend(reproduce_block(_reproduce_command(result.label, ref_sha).splitlines()))
+    return details(summary, body)
 
 
 def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> str:
@@ -197,8 +195,9 @@ def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> s
 
     Layout, top to bottom: headline, ref, the tolerance this track checks
     against, a collapsed "Succeeded files" section (so a scan of the
-    comment sees the good news first), then "Failed files" with full
-    per-indicator detail. ✅/❌ marks are a readability aid only -- the
+    comment sees the good news first), then a collapsed "Failed files"
+    section. Each failed file is its own collapsed block inside it, which
+    opens to the per-indicator detail and a collapsed reproduce command. ✅/❌ marks are a readability aid only -- the
     underlying pass/fail boolean they stand for is unchanged.
     """
     failed = [r for r in results if not r.passed]
@@ -240,23 +239,21 @@ def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> s
     lines.append("")
 
     if passed:
-        lines.append("<details>")
-        lines.append(f"<summary>{_PASS_MARK} Succeeded files ({len(passed)})</summary>")
-        lines.append("")
-        for result in passed:
-            lines.append(f"- `{result.label}`")
-        lines.append("")
-        lines.append("</details>")
+        lines.extend(
+            details(
+                f"{_PASS_MARK} Succeeded files ({n_passed}/{n_total})",
+                [f"- `{result.label}`" for result in passed],
+            )
+        )
         lines.append("")
 
     if failed:
-        lines.append(f"### {_FAIL_MARK} Failed files")
-        lines.append("")
-        lines.append("Each failed file is listed below, with why it failed.")
-        lines.append("")
+        failed_body = ["These files did not pass. Open a file to see why.", ""]
         for result in failed:
-            lines.append(_format_entry(result, ref_sha))
-            lines.append("")
+            failed_body.extend(_format_entry(result, ref_sha))
+            failed_body.append("")
+        lines.extend(details(f"{_FAIL_MARK} Failed files ({len(failed)}/{n_total})", failed_body[:-1]))
+        lines.append("")
     else:
         lines.append("Every file passed.")
         lines.append("")
