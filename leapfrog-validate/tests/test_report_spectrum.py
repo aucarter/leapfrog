@@ -43,19 +43,61 @@ def test_no_files_compared_is_reported_plainly():
     assert "No PJNZ files" in body
 
 
-def test_all_passing_reports_100_percent_with_counts_and_lists_them_as_passed():
+def test_all_passing_reports_100_percent_with_counts_and_lists_them_as_succeeded():
     results = [
         PjnzResult(label="a.PJNZ", indicators=_passing("total_population", "hiv_population")),
         PjnzResult(label="b.PJNZ", indicators=_passing("total_population", "hiv_population")),
     ]
     body = format_comment(results, ref_given="main", ref_sha="abc1234")
-    assert "100% of files pass (2/2)" in body
+    assert "✅ PASS -- 100% of files pass (2/2)" in body
     assert "Every file passed." in body
-    # Passed files are listed in a collapsible section, not hidden entirely.
+    # Succeeded files are listed in a collapsible section, not hidden entirely.
     assert "<details>" in body
-    assert "Files that passed (2)" in body
+    assert "Succeeded files (2)" in body
     assert "a.PJNZ" in body
     assert "b.PJNZ" in body
+
+
+def test_succeeded_files_section_is_collapsed_and_comes_before_failed_files():
+    results = [
+        PjnzResult(label="good.PJNZ", indicators=_passing("x")),
+        PjnzResult(label="bad.PJNZ", indicators=(IndicatorResult(name="x", passed=False),)),
+    ]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    succeeded_pos = body.index("<summary>")
+    failed_pos = body.index("### ")
+    assert succeeded_pos < failed_pos
+    assert "<summary>✅ Succeeded files (1)</summary>" in body
+
+
+def test_failed_entry_shows_a_tick_or_cross_per_indicator():
+    results = [
+        PjnzResult(
+            label="mixed.PJNZ",
+            indicators=(
+                IndicatorResult(name="total_population", passed=True),
+                IndicatorResult(name="hiv_population", passed=False),
+            ),
+        ),
+    ]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    assert "✅ total_population" in body
+    assert "❌ hiv_population" in body
+
+
+def test_lists_the_indicators_checked_with_their_tolerance():
+    results = [PjnzResult(label="a.PJNZ", indicators=_passing("total_population"))]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    assert "Indicators checked (5)" in body
+    assert "total_population" in body
+    assert "hiv_population" in body
+    assert "treatment_population" in body
+    assert "aids_deaths_single_age" in body
+    assert "aids_deaths_on_treatment" in body
+    # Specific tolerance values, not just the word "tolerance".
+    assert "50" in body
+    assert "20" in body
+    assert "1%" in body
 
 
 def test_a_failed_file_is_named_with_its_pass_rate():
