@@ -194,14 +194,6 @@ def test_domain_tags_for_aim_only_fixtures(head_workspace, pjnz):
 
 @requires_r
 def test_domain_tags_for_goals_fixture(head_workspace):
-    """Ground truth verified empirically, now that `process_pjnz_ha`'s bug is fixed.
-
-    This PJNZ used to raise `ClassifyError` because `process_pjnz()` itself
-    errored inside `process_pjnz_ha` on any PJNZ where EPP returns more than
-    one PWID-subpopulation value for `pwid_hivpos_nonaids_mortality` (see
-    `process_pjnz_ha.R`'s fix). Locked down here as a real regression test:
-    this must keep succeeding.
-    """
     assert classify.domain_tags(head_workspace, GOALS_FIXTURE) == frozenset({"has_pmtct", "has_cotrim"})
 
 
