@@ -6,7 +6,11 @@ std::vector<std::string> list_model_configurations() {
     "HivFullAgeStratification",
     "HivCoarseAgeStratification",
     "ChildModel",
-    "Spectrum"
+    "CoarseChildModel",
+    "Spectrum",
+    "GBD",
+    "GBDvirgin",
+    "HivStructuralRate"
   };
 }
 
@@ -20,8 +24,16 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::HivCoarseAgeStratification>(std::forward<Args>(args)...);
   } else if (configuration == "ChildModel") {
     return simulate_model<leapfrog::ChildModel>(std::forward<Args>(args)...);
+  } else if (configuration == "CoarseChildModel") {
+    return simulate_model<leapfrog::CoarseChildModel>(std::forward<Args>(args)...);
   } else if (configuration == "Spectrum") {
     return simulate_model<leapfrog::Spectrum>(std::forward<Args>(args)...);
+  } else if (configuration == "GBD") {
+    return simulate_model<leapfrog::GBD>(std::forward<Args>(args)...);
+  } else if (configuration == "GBDvirgin") {
+    return simulate_model<leapfrog::GBDvirgin>(std::forward<Args>(args)...);
+  } else if (configuration == "HivStructuralRate") {
+    return simulate_model<leapfrog::HivStructuralRate>(std::forward<Args>(args)...);
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;
@@ -77,8 +89,16 @@ nb::dict get_leapfrog_ss(const std::string configuration) {
     return leapfrog::get_ss_py<leapfrog::HivCoarseAgeStratification>();
   } else if (configuration == "ChildModel") {
     return leapfrog::get_ss_py<leapfrog::ChildModel>();
+  } else if (configuration == "CoarseChildModel") {
+    return leapfrog::get_ss_py<leapfrog::CoarseChildModel>();
   } else if (configuration == "Spectrum") {
     return leapfrog::get_ss_py<leapfrog::Spectrum>();
+  } else if (configuration == "GBD") {
+    return leapfrog::get_ss_py<leapfrog::GBD>();
+  } else if (configuration == "GBDvirgin") {
+    return leapfrog::get_ss_py<leapfrog::GBDvirgin>();
+  } else if (configuration == "HivStructuralRate") {
+    return leapfrog::get_ss_py<leapfrog::HivStructuralRate>();
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;
@@ -107,6 +127,9 @@ NB_MODULE(_core, m) {
   )pbdoc");
   m.def("run_base_model_single_year", &run_base_model_single_year, R"pbdoc(
       Run the leapfrog model from an initial state for a single year.
+  )pbdoc");
+  m.def("list_model_configurations_py", &list_model_configurations, R"pbdoc(
+    List the available model configurations.
   )pbdoc");
   m.def("get_leapfrog_ss_py", &get_leapfrog_ss, R"pbdoc(
     Get the state space dimensions for a specific model variant,
