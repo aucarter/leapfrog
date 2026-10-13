@@ -8,6 +8,8 @@ against known input verdicts").
 
 import re
 
+from _comment_asserts import assert_nested_collapsed_failures
+
 from leapfrog_validate.report_spectrum import (
     COMMENT_MARKER,
     IndicatorResult,
@@ -43,6 +45,22 @@ def test_no_files_compared_is_reported_plainly():
     assert "No PJNZ files" in body
 
 
+def test_failed_files_are_nested_and_collapsed():
+    results = [
+        PjnzResult(label="good.PJNZ", indicators=_passing("x")),
+        PjnzResult(label="ETH/bad.PJNZ", indicators=(IndicatorResult(name="x", passed=False),)),
+    ]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    assert_nested_collapsed_failures(body, "<summary>❌ Failed files (1/2)</summary>", "ETH/bad.PJNZ")
+    assert "<summary><code>ETH/bad.PJNZ</code> -- 0/1 indicators passed</summary>" in body
+
+
+def test_file_names_are_html_escaped_inside_summaries():
+    results = [PjnzResult(label="a&b<c>.PJNZ", indicators=(IndicatorResult(name="x", passed=False),))]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    assert "<code>a&amp;b&lt;c&gt;.PJNZ</code>" in body
+
+
 def test_all_passing_reports_100_percent_with_counts_and_lists_them_as_succeeded():
     results = [
         PjnzResult(label="a.PJNZ", indicators=_passing("total_population", "hiv_population")),
@@ -53,7 +71,7 @@ def test_all_passing_reports_100_percent_with_counts_and_lists_them_as_succeeded
     assert "Every file passed." in body
     # Succeeded files are listed in a collapsible section, not hidden entirely.
     assert "<details>" in body
-    assert "Succeeded files (2)" in body
+    assert "Succeeded files (2/2)" in body
     assert "a.PJNZ" in body
     assert "b.PJNZ" in body
 
@@ -64,10 +82,10 @@ def test_succeeded_files_section_is_collapsed_and_comes_before_failed_files():
         PjnzResult(label="bad.PJNZ", indicators=(IndicatorResult(name="x", passed=False),)),
     ]
     body = format_comment(results, ref_given="main", ref_sha="abc1234")
-    succeeded_pos = body.index("<summary>")
-    failed_pos = body.index("### ")
+    succeeded_pos = body.index("<summary>✅ Succeeded files")
+    failed_pos = body.index("<summary>❌ Failed files")
     assert succeeded_pos < failed_pos
-    assert "<summary>✅ Succeeded files (1)</summary>" in body
+    assert "<summary>✅ Succeeded files (1/2)</summary>" in body
 
 
 def test_failed_entry_shows_a_tick_or_cross_per_indicator():
@@ -147,7 +165,8 @@ def test_an_errored_file_counts_as_a_failure_and_shows_its_reason():
     assert "passing.PJNZ" in body
     # The errored file counts as a failure: 1 of 2 files passed.
     assert "50% of files pass (1/2)" in body
-    assert "could not be compared: could not build/run leapfrog for this PJNZ (xyz)" in body
+    assert "-- could not be compared</summary>" in body
+    assert "Could not be compared: could not build/run leapfrog for this PJNZ (xyz)" in body
 
 
 def test_error_reason_is_shown_not_just_a_generic_placeholder():

@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from leapfrog_validate import classify, cli, git_utils, manifest
+from leapfrog_validate.comment_format import code_label, details, reproduce_block
 from leapfrog_validate.subprocess_utils import summarize_error_reason
 
 _PASS_MARK = "✅"
@@ -292,9 +293,8 @@ def render_comment(report: RegressionReport) -> str:
 
     Follows the PRD's Phase 1 "Reporting & UI" spec: one top line with
     overall % pass (and the raw counts behind it, e.g. "56/56"), then only
-    the list of *failed* PJNZ with their own pass rate (never a fully
-    nested PJNZ->indicator tree), a copy-pasteable reproduce command per
-    failed file with resolved SHAs, and no plot links (no hosted
+    the failed PJNZ, each in its own collapsed block with its own pass rate and a
+    copy-pasteable reproduce command with resolved SHAs, and no plot links (no hosted
     drill-down view exists yet). Never says "Track A"/"Track B" -- named
     by what it compares instead. Prose is written in short, plain,
     one-idea sentences (headers/labels stay terse noun phrases); code,
@@ -308,8 +308,9 @@ def render_comment(report: RegressionReport) -> str:
 
     Layout, top to bottom: headline, ref, the tolerance this track checks
     against, a collapsed "Succeeded files" section (so a scan of the
-    comment sees the good news first), then "Failed files" with full
-    per-indicator detail. ✅/❌ marks are a readability aid only -- the
+    comment sees the good news first), then a collapsed "Failed files"
+    section. Each failed file is its own collapsed block inside it, which
+    opens to the per-indicator detail and a collapsed reproduce command. ✅/❌ marks are a readability aid only -- the
     underlying pass/fail boolean they stand for is unchanged.
     """
     lines = [
@@ -338,13 +339,12 @@ def render_comment(report: RegressionReport) -> str:
 
     passed = report.passed_results
     if passed:
-        lines.append("<details>")
-        lines.append(f"<summary>{_PASS_MARK} Succeeded files ({len(passed)})</summary>")
-        lines.append("")
-        for result in passed:
-            lines.append(f"- `{result.label}`")
-        lines.append("")
-        lines.append("</details>")
+        lines.extend(
+            details(
+                f"{_PASS_MARK} Succeeded files ({len(passed)}/{n_total})",
+                [f"- `{result.label}`" for result in passed],
+            )
+        )
         lines.append("")
 
     failed = report.failed_results
@@ -354,25 +354,13 @@ def render_comment(report: RegressionReport) -> str:
         lines.append("All files passed.")
         lines.append("")
     else:
-        lines.append(f"### {_FAIL_MARK} Failed files")
+        lines.extend(
+            details(
+                f"{_FAIL_MARK} Failed files ({len(failed)}/{n_total})",
+                _failed_file_blocks(report, genuine_failed, errored),
+            )
+        )
         lines.append("")
-        lines.append("These files were compared. They did not pass.")
-        lines.append("")
-        for result in genuine_failed:
-            file_pct = round(result.pass_rate * 100)
-            lines.append(f"- `{result.label}` -- {file_pct}% pass ({result.n_passed}/{result.n_applicable} indicators)")
-            for outcome in result.indicators:
-                mark = _PASS_MARK if outcome.passed else _FAIL_MARK
-                lines.append(f"  - {mark} {outcome.name}")
-            lines.append("")
-            lines.extend(_reproduce_details_block(report, result.label))
-            lines.append("")
-        for result in errored:
-            reason = result.error_reason or "unknown error"
-            lines.append(f"- `{result.label}` -- could not be compared: {reason}")
-            lines.append("")
-            lines.extend(_reproduce_details_block(report, result.label))
-            lines.append("")
 
     lines.append("---")
     lines.append("This check never shows real numbers. It only shows pass or fail, and file names.")
@@ -380,19 +368,35 @@ def render_comment(report: RegressionReport) -> str:
     return "\n".join(lines)
 
 
+def _failed_file_blocks(
+    report: RegressionReport,
+    genuine_failed: list[PjnzRegressionResult],
+    errored: tuple[PjnzRegressionResult, ...],
+) -> list[str]:
+    """Build one closed `<details>` block per failed file, for the "Failed files" body.
+
+    Each block opens to the file's indicator ticks/crosses (or the reason
+    it could not be compared) and its own closed "Reproduce this" block.
+    """
+    lines = ["These files did not pass. Open a file to see why.", ""]
+    for result in genuine_failed:
+        body = [f"- {_PASS_MARK if outcome.passed else _FAIL_MARK} {outcome.name}" for outcome in result.indicators]
+        body.append("")
+        body.extend(_reproduce_details_block(report, result.label))
+        summary = f"{code_label(result.label)} -- {result.n_passed}/{result.n_applicable} indicators passed"
+        lines.extend(details(summary, body))
+        lines.append("")
+    for result in errored:
+        body = [f"Could not be compared: {result.error_reason or 'unknown error'}", ""]
+        body.extend(_reproduce_details_block(report, result.label))
+        lines.extend(details(f"{code_label(result.label)} -- could not be compared", body))
+        lines.append("")
+    return lines[:-1]
+
+
 def _reproduce_details_block(report: RegressionReport, label: str) -> list[str]:
-    """Build the `<details><summary>Reproduce this</summary>...</details>` block for one PJNZ."""
-    lines = [
-        "  <details>",
-        "  <summary>Reproduce this</summary>",
-        "",
-        "  ```bash",
-    ]
-    for command_line in _reproduce_command_lines(report.ref.sha, report.candidate.sha, label, report.configuration):
-        lines.append(f"  {command_line}")
-    lines.append("  ```")
-    lines.append("  </details>")
-    return lines
+    """Build the closed "Reproduce this" block for one PJNZ."""
+    return reproduce_block(_reproduce_command_lines(report.ref.sha, report.candidate.sha, label, report.configuration))
 
 
 @dataclass(frozen=True)
