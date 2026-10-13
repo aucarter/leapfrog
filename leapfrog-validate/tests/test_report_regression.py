@@ -115,7 +115,7 @@ class TestRenderCommentAllPassing:
 
     def test_no_failed_files_section(self):
         assert "Failed files" not in self.markdown
-        assert "All comparable files passed" in self.markdown
+        assert "All files passed" in self.markdown
 
     def test_never_shows_a_raw_diff_magnitude(self):
         # The data model this renders from never carries a magnitude at
@@ -145,9 +145,12 @@ class TestRenderCommentWithFailures:
         assert "FAIL" in self.markdown
         assert "50%" in self.markdown
 
-    def test_lists_only_the_failed_file_not_the_passing_one(self):
+    def test_lists_the_failed_file_and_the_passing_one_in_its_own_section(self):
         assert "ETH/bad.PJNZ" in self.markdown
-        assert "good.PJNZ" not in self.markdown
+        # Passed files are listed too, in their own collapsible section --
+        # not hidden entirely, so "100%"/"50%" etc. is backed by named files.
+        assert "<summary>Files that passed (1)</summary>" in self.markdown
+        assert "good.PJNZ" in self.markdown
 
     def test_failed_file_shows_its_own_pass_rate(self):
         assert "60%" in self.markdown
@@ -188,14 +191,14 @@ class TestRenderCommentEdgeCases:
         assert "PASS" in markdown
 
 
-class TestRenderCommentErroredFilesNeverCountAsRegressions:
-    """`errored` must never be conflated with a genuine indicator regression.
+class TestRenderCommentErroredFilesCountAsFailures:
+    """An `errored` file (a build/run/classify failure) counts as a failure.
 
-    Reproduces the exact real-world shape that surfaced this bug during
-    this ticket's own live verification: comparing two refs with
-    byte-identical model code, where some PJNZ files hit a pre-existing,
-    unrelated data issue (always `errored`, never a real indicator
-    mismatch) must render as a clean pass, not a misleading low "% pass".
+    Reverses an earlier design: if the check cannot build or run a file at
+    all, that is itself a real problem worth seeing as a failure, not a
+    number quietly carved out of the headline pass rate. It still shows a
+    distinct reason (not an indicator pass count) so it stays visually
+    distinguishable from a genuine indicator mismatch.
     """
 
     def setup_method(self):
@@ -203,32 +206,37 @@ class TestRenderCommentErroredFilesNeverCountAsRegressions:
             (
                 PjnzRegressionResult(label="good_a.PJNZ", n_passed=5, n_applicable=5),
                 PjnzRegressionResult(label="good_b.PJNZ", n_passed=5, n_applicable=5),
-                PjnzRegressionResult(label="broken_a.PJNZ", n_passed=0, n_applicable=0, errored=True),
-                PjnzRegressionResult(label="broken_b.PJNZ", n_passed=0, n_applicable=0, errored=True),
-                PjnzRegressionResult(label="broken_c.PJNZ", n_passed=0, n_applicable=0, errored=True),
+                PjnzRegressionResult(
+                    label="broken_a.PJNZ", n_passed=0, n_applicable=0, errored=True, error_reason="boom a"
+                ),
+                PjnzRegressionResult(
+                    label="broken_b.PJNZ", n_passed=0, n_applicable=0, errored=True, error_reason="boom b"
+                ),
+                PjnzRegressionResult(
+                    label="broken_c.PJNZ", n_passed=0, n_applicable=0, errored=True, error_reason="boom c"
+                ),
             )
         )
         self.markdown = render_comment(self.report)
 
-    def test_errored_files_do_not_count_toward_the_headline_pass_rate(self):
-        # 2 of 2 *comparable* files passed -- not 2 of 5.
-        assert self.report.overall_pass_rate == 1.0
-        assert self.report.overall_passed is True
-        assert "100%" in self.markdown
-        assert "PASS" in self.markdown
+    def test_errored_files_count_toward_the_headline_pass_rate(self):
+        # 2 of 5 files passed -- the 3 errored files count as failures.
+        assert self.report.overall_pass_rate == 2 / 5
+        assert self.report.overall_passed is False
+        assert "40% of files pass (2/5)" in self.markdown
+        assert "FAIL" in self.markdown
 
-    def test_errored_files_are_listed_separately_from_failed_files(self):
-        assert "### Files that could not be compared" in self.markdown
+    def test_errored_files_are_listed_under_failed_files_with_their_reason(self):
+        assert "### Failed files" in self.markdown
         assert "broken_a.PJNZ" in self.markdown
+        assert "boom a" in self.markdown
         assert "broken_b.PJNZ" in self.markdown
         assert "broken_c.PJNZ" in self.markdown
-        # No "Failed files" section at all -- nothing genuinely regressed.
-        assert "### Failed files" not in self.markdown
 
-    def test_comparable_and_errored_result_properties(self):
-        assert len(self.report.comparable_results) == 2
+    def test_errored_result_properties(self):
         assert len(self.report.errored_results) == 3
-        assert self.report.failed_results == ()
+        assert len(self.report.failed_results) == 3
+        assert len(self.report.passed_results) == 2
 
 
 class TestRenderCommentGenuineFailureStillReported:
@@ -238,21 +246,23 @@ class TestRenderCommentGenuineFailureStillReported:
         self.report = _report(
             (
                 PjnzRegressionResult(label="regressed.PJNZ", n_passed=2, n_applicable=5),
-                PjnzRegressionResult(label="broken.PJNZ", n_passed=0, n_applicable=0, errored=True),
+                PjnzRegressionResult(
+                    label="broken.PJNZ", n_passed=0, n_applicable=0, errored=True, error_reason="synthetic failure"
+                ),
             )
         )
         self.markdown = render_comment(self.report)
 
-    def test_overall_result_is_fail_driven_only_by_the_genuine_regression(self):
-        # 0 of 1 *comparable* file passed -- the errored file isn't in the denominator.
+    def test_overall_result_is_fail_and_both_files_count(self):
+        # 0 of 2 files passed -- both the regression and the errored file count.
         assert self.report.overall_pass_rate == 0.0
         assert self.report.overall_passed is False
         assert "FAIL" in self.markdown
-        assert "0%" in self.markdown
+        assert "0% of files pass (0/2)" in self.markdown
 
-    def test_both_sections_present_and_distinct(self):
+    def test_both_failures_present_and_distinguishable(self):
         assert "### Failed files" in self.markdown
         assert "regressed.PJNZ" in self.markdown
-        assert "40%" in self.markdown  # 2/5
-        assert "### Files that could not be compared" in self.markdown
+        assert "40%" in self.markdown  # 2/5 indicators
         assert "broken.PJNZ" in self.markdown
+        assert "could not be compared: synthetic failure" in self.markdown

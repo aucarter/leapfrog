@@ -244,14 +244,15 @@ class TestComputeRegressionReportClassifyErrorHandling:
         assert labels["good.PJNZ"].passed is True
         assert labels["bad.PJNZ"].passed is False
         assert labels["bad.PJNZ"].errored is True
-        # An errored file is "unknown", not "regressed" -- it must never
-        # count toward the pass/fail verdict or the headline pass rate
-        # (a real bug this ticket's own live verification against the
-        # real corpus caught: a pre-existing, PR-unrelated data issue on
-        # one file was making the whole check permanently fail).
-        assert report.overall_passed is True
-        assert report.failed_results == ()
+        # An errored file counts as a failure, same as a genuine
+        # regression -- a build/run/classify failure is itself a real
+        # problem worth seeing on every PR, not a number carved out of the
+        # headline. It still carries a real, summarized reason, not a
+        # generic placeholder.
+        assert report.overall_passed is False
+        assert labels["bad.PJNZ"] in report.failed_results
         assert labels["bad.PJNZ"] in report.errored_results
+        assert "synthetic failure" in labels["bad.PJNZ"].error_reason
 
 
 class TestComputeRegressionReportBuildRunErrorHandling:
@@ -293,9 +294,10 @@ class TestComputeRegressionReportBuildRunErrorHandling:
         assert labels["good.PJNZ"].passed is True
         assert labels["bad.PJNZ"].passed is False
         assert labels["bad.PJNZ"].errored is True
-        assert report.overall_passed is True
-        assert report.failed_results == ()
+        assert report.overall_passed is False
+        assert labels["bad.PJNZ"] in report.failed_results
         assert labels["bad.PJNZ"] in report.errored_results
+        assert "synthetic ParamsBuildError" in labels["bad.PJNZ"].error_reason
 
     def test_model_run_error_on_one_file_does_not_abort_the_whole_batch(
         self, fake_build_and_run, tmp_path, monkeypatch
@@ -324,9 +326,10 @@ class TestComputeRegressionReportBuildRunErrorHandling:
         assert labels["good.PJNZ"].passed is True
         assert labels["bad.PJNZ"].passed is False
         assert labels["bad.PJNZ"].errored is True
-        assert report.overall_passed is True
-        assert report.failed_results == ()
+        assert report.overall_passed is False
+        assert labels["bad.PJNZ"] in report.failed_results
         assert labels["bad.PJNZ"] in report.errored_results
+        assert "synthetic ModelRunError" in labels["bad.PJNZ"].error_reason
 
     def test_build_run_error_log_line_never_includes_the_exception_message(
         self, fake_build_and_run, tmp_path, monkeypatch

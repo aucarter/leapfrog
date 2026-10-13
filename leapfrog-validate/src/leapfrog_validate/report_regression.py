@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from leapfrog_validate import classify, cli, git_utils, manifest
+from leapfrog_validate.subprocess_utils import summarize_error_reason
 
 # Identifies this track to `marocchino/sticky-pull-request-comment`'s
 # `header:` input, so its find-or-update marker never collides with the
@@ -103,25 +104,29 @@ class PjnzRegressionResult:
     issue on one specific PJNZ -- see `compute_regression_report`'s
     `classify.ClassifyError`/`params.ParamsBuildError`/
     `model_run.ModelRunError` handling) from "was compared and some
-    indicator didn't match" (a genuine regression). Conflating the two
-    under one pass/fail is a real bug this ticket's own live verification
-    against the real corpus caught: comparing two commits with byte-
-    identical model code still showed a scary, misleading "32% of files
-    pass" headline, because ~97 of 143 real corpus files hit an unrelated,
-    pre-existing `process_pjnz_ha` limitation (confirmed via the actual CI
-    job log -- every one of them `ParamsBuildError`, zero genuine indicator
-    mismatches) and were being counted as regressions. An `errored` file
-    is reported separately (see `RegressionReport.errored_results`) and
-    never counts toward the pass/fail verdict or headline pass rate --
-    otherwise a single pre-existing, PR-unrelated data issue would
-    permanently fail this check for every future PR regardless of whether
-    the PR itself regressed anything, which would make the check useless.
+    indicator didn't match" (a genuine regression) -- `error_reason` carries
+    a short, public-comment-safe summary of what actually went wrong (see
+    `subprocess_utils.summarize_error_reason`), so a maintainer can tell
+    what to reproduce locally rather than just "something failed".
+
+    **An `errored` file still counts as a failure.** An earlier version of
+    this field excluded errored files from the pass/fail verdict and
+    headline pass rate entirely, reasoning that a pre-existing,
+    PR-unrelated `process_pjnz_ha` limitation (hit by ~97 of 143 real
+    corpus files during this ticket's own live verification) shouldn't be
+    conflated with a genuine regression. That reasoning was overridden on
+    request: if the check cannot build or run a file at all, that is
+    itself a real problem worth seeing as a failure on every PR, not a
+    number quietly carved out of the headline -- `errored` still changes
+    *how* the failure is described (a reason, not an indicator count), not
+    whether it counts.
     """
 
     label: str
     n_passed: int
     n_applicable: int
     errored: bool = False
+    error_reason: str | None = None
 
     @property
     def passed(self) -> bool:
@@ -155,45 +160,44 @@ class RegressionReport:
     configuration: str = "Spectrum"
 
     @property
-    def comparable_results(self) -> tuple[PjnzRegressionResult, ...]:
-        """Every PJNZ that was actually compared -- excludes `errored` files."""
-        return tuple(r for r in self.results if not r.errored)
-
-    @property
     def errored_results(self) -> tuple[PjnzRegressionResult, ...]:
-        """Every PJNZ that could not be compared at all (a classify or build/run failure)."""
+        """Every PJNZ that could not be compared at all (a classify or build/run failure).
+
+        Still counted as failed everywhere below -- this property exists
+        for rendering (showing *why* a failure happened), not for
+        excluding anything from the pass/fail verdict.
+        """
         return tuple(r for r in self.results if r.errored)
 
     @property
     def overall_passed(self) -> bool:
-        """Whether every *comparable* PJNZ passed (vacuously true if none were comparable).
-
-        `errored` files never affect this -- they represent "unknown",
-        not "regressed" (see `PjnzRegressionResult`'s docstring).
-        """
-        return all(r.passed for r in self.comparable_results)
+        """Whether every PJNZ passed -- an `errored` file counts as not passed."""
+        return all(r.passed for r in self.results)
 
     @property
     def overall_pass_rate(self) -> float:
-        """The headline number: fraction of *comparable* files that passed overall.
+        """The headline number: fraction of all files that passed overall.
 
         Deliberately coarser than `PjnzRegressionResult.pass_rate` (which
         is per-file, indicator-level) -- mirrors the PRD's dashboard split
         between a corpus-wide "headline pass rate" and each row's own
-        "indicators-passed fraction". Computed over `comparable_results`
-        only, for the same reason `overall_passed` is -- an `errored`
-        file would otherwise silently drag this number down for a reason
-        that has nothing to do with whether the PR regressed anything.
+        "indicators-passed fraction". Computed over every result,
+        `errored` included -- a build/run failure counts as a failure here
+        (see `PjnzRegressionResult`'s docstring for why).
         """
-        comparable = self.comparable_results
-        if not comparable:
+        if not self.results:
             return 1.0
-        return sum(1 for r in comparable if r.passed) / len(comparable)
+        return sum(1 for r in self.results if r.passed) / len(self.results)
 
     @property
     def failed_results(self) -> tuple[PjnzRegressionResult, ...]:
-        """Only the *comparable* PJNZ that genuinely failed (a real indicator mismatch)."""
-        return tuple(r for r in self.comparable_results if not r.passed)
+        """Every PJNZ that failed -- a real indicator mismatch, or a build/run/classify error."""
+        return tuple(r for r in self.results if not r.passed)
+
+    @property
+    def passed_results(self) -> tuple[PjnzRegressionResult, ...]:
+        """Every PJNZ that passed."""
+        return tuple(r for r in self.results if r.passed)
 
 
 def _reproduce_command_lines(ref_sha: str, candidate_sha: str, label: str, configuration: str) -> list[str]:
@@ -228,17 +232,22 @@ def render_comment(report: RegressionReport) -> str:
     """Render `report` as the regression track's sticky-comment markdown.
 
     Follows the PRD's Phase 1 "Reporting & UI" spec: one top line with
-    overall % pass, then only the list of *failed* PJNZ with their own
-    pass rate (never a fully nested PJNZ->indicator tree), a
-    copy-pasteable reproduce command per failed file with resolved SHAs,
-    and no plot links (no hosted drill-down view exists yet). A separate
-    "could not be compared" section lists `errored` files (see
-    `PjnzRegressionResult`'s docstring) -- distinct from genuine failures,
-    and excluded from the headline pass rate. Never says "Track A"/
-    "Track B" -- named by what it compares instead. Prose is written in
-    short, plain, one-idea sentences (headers/labels stay terse noun
-    phrases); code, filenames, SHAs, and commands are left exactly as they
-    are.
+    overall % pass (and the raw counts behind it, e.g. "56/56"), then only
+    the list of *failed* PJNZ with their own pass rate (never a fully
+    nested PJNZ->indicator tree), a copy-pasteable reproduce command per
+    failed file with resolved SHAs, and no plot links (no hosted
+    drill-down view exists yet). Never says "Track A"/"Track B" -- named
+    by what it compares instead. Prose is written in short, plain,
+    one-idea sentences (headers/labels stay terse noun phrases); code,
+    filenames, SHAs, and commands are left exactly as they are.
+
+    A build/run/classify failure (`errored`) counts as a failed file here,
+    same as a genuine indicator mismatch -- see `PjnzRegressionResult`'s
+    docstring for why. It still gets its own distinct wording (the actual
+    error reason, not an indicator pass count) so the two stay visually
+    distinguishable even though both now count the same way. Passed files
+    are listed too, in a collapsible section, so a "100% pass" headline is
+    backed by named files rather than an unverifiable number.
     """
     lines = [
         "## leapfrog vs leapfrog regression",
@@ -250,44 +259,45 @@ def render_comment(report: RegressionReport) -> str:
 
     status = "PASS" if report.overall_passed else "FAIL"
     pct = round(report.overall_pass_rate * 100)
-    lines.append(f"**Result: {status} -- {pct}% of files pass.**")
+    n_total = len(report.results)
+    n_passed = len(report.passed_results)
+    lines.append(f"**Result: {status} -- {pct}% of files pass ({n_passed}/{n_total}).**")
     lines.append("")
 
     failed = report.failed_results
+    genuine_failed = [r for r in failed if not r.errored]
+    errored = report.errored_results
     if not failed:
-        lines.append("All comparable files passed.")
+        lines.append("All files passed.")
         lines.append("")
     else:
         lines.append("### Failed files")
         lines.append("")
         lines.append("These files were compared. They did not pass.")
         lines.append("")
-        for result in failed:
+        for result in genuine_failed:
             file_pct = round(result.pass_rate * 100)
             lines.append(f"- `{result.label}` -- {file_pct}% pass ({result.n_passed}/{result.n_applicable} indicators)")
             lines.append("")
             lines.extend(_reproduce_details_block(report, result.label))
             lines.append("")
-
-    errored = report.errored_results
-    if errored:
-        lines.append("### Files that could not be compared")
-        lines.append("")
-        # Deliberately not asserted as "not your fault" -- a build/run
-        # failure introduced by the PR itself is also possible (this
-        # module cannot tell the two apart yet, see its own module
-        # docstring); stay neutral and let the reproduce command speak
-        # for itself.
-        lines.append(
-            "This check could not build or run these files. This can be a data problem. "
-            "It can also be a code problem. It does not count toward the result above."
-        )
-        lines.append("")
         for result in errored:
-            lines.append(f"- `{result.label}`")
+            reason = result.error_reason or "unknown error"
+            lines.append(f"- `{result.label}` -- could not be compared: {reason}")
             lines.append("")
             lines.extend(_reproduce_details_block(report, result.label))
             lines.append("")
+
+    passed = report.passed_results
+    if passed:
+        lines.append("<details>")
+        lines.append(f"<summary>Files that passed ({len(passed)})</summary>")
+        lines.append("")
+        for result in passed:
+            lines.append(f"- `{result.label}`")
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     lines.append("---")
     lines.append("This check never shows real numbers. It only shows pass or fail, and file names.")
@@ -422,9 +432,12 @@ def compute_regression_report(  # noqa: PLR0913
                     if needs_tags
                     else frozenset()
                 )
-            except classify.ClassifyError:
+            except classify.ClassifyError as e:
                 log(f"ERROR {label}: could not classify")
-                results.append(PjnzRegressionResult(label=label, n_passed=0, n_applicable=0, errored=True))
+                reason = f"could not classify this PJNZ ({summarize_error_reason(e)})"
+                results.append(
+                    PjnzRegressionResult(label=label, n_passed=0, n_applicable=0, errored=True, error_reason=reason)
+                )
                 continue
 
             applicable = cli._applicable_indicator_names(pjnz_tags)
@@ -438,10 +451,17 @@ def compute_regression_report(  # noqa: PLR0913
                 # against the real corpus during this ticket's build --
                 # see Comments) -- same shape as ticket 20's own fix for
                 # `classify.ClassifyError` not aborting the whole batch.
-                # Logs only the exception's type, never its message (which
-                # can embed the subprocess's captured stdout/stderr).
+                # Logs only the exception's type to the CI job log, never
+                # its full message (which embeds the subprocess's captured
+                # stdout/stderr) -- `summarize_error_reason` extracts a
+                # short, public-comment-safe line from it instead, so the
+                # PR comment can still say *what* broke, not just *that*
+                # something did.
                 log(f"ERROR {label}: could not build/run ({type(e).__name__})")
-                results.append(PjnzRegressionResult(label=label, n_passed=0, n_applicable=0, errored=True))
+                reason = f"could not build/run leapfrog for this PJNZ ({summarize_error_reason(e)})"
+                results.append(
+                    PjnzRegressionResult(label=label, n_passed=0, n_applicable=0, errored=True, error_reason=reason)
+                )
                 continue
             n_passed = sum(1 for v in verdicts if v.passed)
             results.append(PjnzRegressionResult(label=label, n_passed=n_passed, n_applicable=len(verdicts)))
