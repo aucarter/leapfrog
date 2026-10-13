@@ -14,6 +14,8 @@ pattern `test_cli_compare.py` already established.
 
 import re
 
+from _comment_asserts import assert_nested_collapsed_failures
+
 from leapfrog_validate.report_regression import (
     IndicatorOutcome,
     PjnzRegressionResult,
@@ -150,12 +152,14 @@ class TestRenderCommentWithFailures:
         assert "ETH/bad.PJNZ" in self.markdown
         # Passed files are listed too, in their own collapsible section --
         # not hidden entirely, so "100%"/"50%" etc. is backed by named files.
-        assert "<summary>✅ Succeeded files (1)</summary>" in self.markdown
+        assert "<summary>✅ Succeeded files (1/2)</summary>" in self.markdown
         assert "good.PJNZ" in self.markdown
 
     def test_failed_file_shows_its_own_pass_rate(self):
-        assert "60%" in self.markdown
-        assert "3/5" in self.markdown or "3 of 5" in self.markdown
+        assert "<summary><code>ETH/bad.PJNZ</code> -- 3/5 indicators passed</summary>" in self.markdown
+
+    def test_failed_files_are_nested_and_collapsed(self):
+        assert_nested_collapsed_failures(self.markdown, "<summary>❌ Failed files (1/2)</summary>", "ETH/bad.PJNZ")
 
     def test_reproduce_command_uses_resolved_shas_not_moving_ref_names(self):
         # The PRD explicitly forbids a moving ref name like "main" inside
@@ -238,7 +242,7 @@ class TestRenderCommentSucceededFilesSectionOrderAndTicks:
 
     def test_succeeded_files_section_is_collapsed_and_comes_before_failed_files(self):
         succeeded_pos = self.markdown.index("<summary>✅ Succeeded files")
-        failed_pos = self.markdown.index("### ❌ Failed files")
+        failed_pos = self.markdown.index("<summary>❌ Failed files")
         assert succeeded_pos < failed_pos
         assert "good.PJNZ" in self.markdown
 
@@ -283,7 +287,7 @@ class TestRenderCommentErroredFilesCountAsFailures:
         assert "FAIL" in self.markdown
 
     def test_errored_files_are_listed_under_failed_files_with_their_reason(self):
-        assert "### ❌ Failed files" in self.markdown
+        assert "<summary>❌ Failed files" in self.markdown
         assert "broken_a.PJNZ" in self.markdown
         assert "boom a" in self.markdown
         assert "broken_b.PJNZ" in self.markdown
@@ -317,8 +321,9 @@ class TestRenderCommentGenuineFailureStillReported:
         assert "0% of files pass (0/2)" in self.markdown
 
     def test_both_failures_present_and_distinguishable(self):
-        assert "### ❌ Failed files" in self.markdown
+        assert "<summary>❌ Failed files" in self.markdown
         assert "regressed.PJNZ" in self.markdown
-        assert "40%" in self.markdown  # 2/5 indicators
+        assert "2/5 indicators passed" in self.markdown
         assert "broken.PJNZ" in self.markdown
-        assert "could not be compared: synthetic failure" in self.markdown
+        assert "-- could not be compared</summary>" in self.markdown
+        assert "Could not be compared: synthetic failure" in self.markdown
