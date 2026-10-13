@@ -1,0 +1,164 @@
+# Spectrum-comparison track (ticket 22): leapfrog vs Spectrum's own PJNZ
+# modvars, at the PRD's looser, non-blocking tolerance. Posts its own
+# sticky PR comment, fully separate from the regression-track comment
+# (ticket 21's `regression-track.yml`, if/once it exists) -- see
+# `.scratch/leapfrog-validation/PRD.md`'s "Reporting & UI" section.
+#
+# This job is deliberately **not** a required status check. That's the
+# entire mechanism -- a GitHub Actions check that is never added to a
+# repo's branch-protection "required status checks" list cannot block a
+# merge, full stop, regardless of whether it reports pass or fail. There
+# is deliberately no `continue-on-error: true` anywhere below forcing this
+# job green: doing that would hide a real crash behind an all-green,
+# comment-less silence, which defeats the entire point of an informational
+# check (confirmed live, PR #401's first throwaway run: a real crash
+# -- see the fetch-depth comment below -- reported job conclusion
+# "success" with zero comment posted, because an earlier draft of this
+# file had `continue-on-error: true` on the comparison step). This job's
+# name was not added to this repo's required-checks list by this change,
+# and should not be -- see this file's trailing comment.
+#
+# Same fork-PR gating pattern ticket 20's `infra/README.md` documents for
+# the regression track: GitHub doesn't issue OIDC tokens (or secrets) to
+# fork-triggered `pull_request` runs by default, but the azure-login and
+# comment-posting steps are gated explicitly anyway, rather than relying on
+# that platform default alone.
+on:
+  pull_request:
+
+name: spectrum-track
+
+permissions:
+  contents: read
+
+jobs:
+  spectrum-comparison:
+    runs-on: ubuntu-latest
+    # Never required to pass for a PR to merge -- see the header comment.
+    # This job's conclusion is left to reflect reality (pass/fail/error);
+    # non-blocking comes from branch-protection config, not from forcing
+    # the step/job status green.
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history, not the default shallow fetch-depth=1: this job
+          # resolves/checks out the PR's own head SHA a second time, inside
+          # the job, via `git_utils.resolve_ref`/`ensure_worktree`
+          # (`leapfrog_validate.build`'s per-ref worktree). A depth-1
+          # checkout of the pull_request merge commit does not fetch the
+          # head commit object itself -- confirmed live (PR #401's
+          # throwaway verification run): `git rev-parse --verify <head-sha>`
+          # failed with "fatal: Needed a single revision" even though that
+          # exact SHA is `github.event.pull_request.head.sha`. Any future
+          # job using the same `leapfrog_validate` ref-resolution machinery
+          # (e.g. ticket 21's regression track, which needs *two* refs)
+          # will hit the identical issue without this.
+          fetch-depth: 0
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+          extra-repositories: "https://mrc-ide.r-universe.dev https://hivtools.r-universe.dev"
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # Matches model-output-equality.yaml's own R setup exactly --
+          # same `leapfrogr` dependency set `build_leapfrogr`'s `R CMD
+          # INSTALL` (shelled out to per-ref by `leapfrog_validate.build`)
+          # needs available on the default R library path.
+          extra-packages: any::rcmdcheck, any::here
+          needs: check
+          working-directory: leapfrogr
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "leapfrog-validate/uv.lock"
+
+      # Only needed on same-repo PRs: a fork PR gets no OIDC token (GitHub's
+      # platform default for pull_request-triggered runs), so this step
+      # would fail there regardless -- gated explicitly anyway rather than
+      # relying on that alone (see header comment and ticket 16's
+      # infra/README.md "Fork PRs" section for why the trust condition
+      # itself can't tell fork and same-repo runs apart).
+      - name: Azure login
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run Spectrum-comparison track
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        working-directory: leapfrog-validate
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_CONTAINER: ${{ vars.AZURE_STORAGE_CONTAINER }}
+        run: |
+          uv sync
+          uv run python -m leapfrog_validate.spectrum_track run \
+            "${{ github.event.pull_request.head.sha }}" \
+            --comment-out spectrum-comment.md
+        # Deliberately no --azure-container/--azure-account flags: both
+        # fall back to the AZURE_STORAGE_CONTAINER/AZURE_STORAGE_ACCOUNT env
+        # vars above (same names ticket 16's infra/deploy.sh publishes as
+        # repo variables, and the same fallback `compare_cmd` already
+        # implements) -- see `spectrum_track.py`'s `run` command.
+        #
+        # This step never prints a raw diff value or indicator number to
+        # its log -- see `spectrum_track.py`'s and `report_spectrum.py`'s
+        # module docstrings for how that's enforced structurally, not just
+        # by convention.
+
+      - name: Find the rendered comment
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        id: find_comment
+        shell: bash
+        run: |
+          if [ -f "leapfrog-validate/spectrum-comment.md" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post sticky comment
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository && steps.find_comment.outputs.found == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: leapfrog-vs-spectrum-comparison
+          path: leapfrog-validate/spectrum-comment.md
+
+# Live-verified, not just authored in a sandbox with no Azure credentials
+# and no real GitHub Actions access: a throwaway PR against
+# hivtools/leapfrog exercised this file for real (checkout, build, Azure
+# OIDC login, the comparison run, and posting the sticky comment). Two
+# real bugs were only found this way, not by local review: (1) the
+# default actions/checkout shallow fetch doesn't include the PR head
+# commit object `git_utils.resolve_ref` needs -- fixed by `fetch-depth: 0`
+# above; (2) an earlier draft had `continue-on-error: true` on the
+# comparison step, which silently turned a real crash into a green,
+# comment-less job -- removed, see the header comment. Full before/after
+# run links and the throwaway PR's number are recorded in this ticket's
+# Comments section:
+# `.scratch/leapfrog-validation/issues/22-spectrum-track-ci-nonblocking-comment.md`.
+# That PR was closed and its branch deleted once verification was done.
+#
+# Also out of this file's reach: GitHub's branch-protection "required
+# status checks" list is repository configuration, not something a
+# workflow YAML file can set or unset. This job's name was not added to
+# that list by this change, and should not be -- that is the actual
+# guarantee behind "never a required status check", not anything encoded
+# here in code.

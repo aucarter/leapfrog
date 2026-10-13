@@ -19,6 +19,14 @@ dependencies = [
     # static secret in either case.
     "azure-storage-blob>=12.19.0",
     "azure-identity>=1.15.0",
+    # Spectrum-comparison track (ticket 22) -- reads Spectrum's own modvars
+    # straight out of a PJNZ (no live Spectrum.exe), the same two
+    # Avenir-Health-authored packages `leapfrog-compare` already depends on
+    # for this. Confirmed real, public PyPI packages (not a private index
+    # needing credentials this sandbox lacks) -- see
+    # `leapfrog_validate/spectrum_extract.py`'s module docstring.
+    "avenir-spectrum-common>=0.1.26",
+    "avenir-spectrum-import-pjnz>=0.1.16",
 ]
 
 [project.scripts]
