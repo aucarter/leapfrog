@@ -56,6 +56,7 @@ from leapfrog_validate.params import ParamsBuildError
 from leapfrog_validate.report_spectrum import IndicatorResult, PjnzResult, format_comment
 from leapfrog_validate.spectrum_extract import SpectrumExtractError
 from leapfrog_validate.spectrum_indicators import SPECTRUM_INDICATORS, diff_spectrum_indicator
+from leapfrog_validate.subprocess_utils import summarize_error_reason
 
 app = typer.Typer(help="Spectrum-comparison track: leapfrog output vs Spectrum's own PJNZ modvars.")
 
@@ -169,7 +170,7 @@ def _compare_one_pjnz_against_spectrum(
         pjnz_tags = _classify_tags(workspace, pjnz)
     except classify.ClassifyError as e:
         typer.echo(f"  ERROR  could not classify: {e}", err=True)
-        return PjnzResult(label=label, error="could not classify this PJNZ")
+        return PjnzResult(label=label, error=f"could not classify this PJNZ ({summarize_error_reason(e)})")
 
     applicable = _applicable_indicator_names(pjnz_tags)
     skipped = sorted(set(SPECTRUM_INDICATORS) - set(applicable))
@@ -184,7 +185,8 @@ def _compare_one_pjnz_against_spectrum(
         model_run.run_model(workspace, params_path, output_path, configuration)
     except (ParamsBuildError, ModelRunError) as e:
         typer.echo(f"  ERROR  could not build/run leapfrog for this PJNZ: {e}", err=True)
-        return PjnzResult(label=label, error="could not build/run leapfrog for this PJNZ")
+        reason = summarize_error_reason(e)
+        return PjnzResult(label=label, error=f"could not build/run leapfrog for this PJNZ ({reason})")
 
     indicator_results = []
     for name in applicable:

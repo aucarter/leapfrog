@@ -194,7 +194,7 @@ def test_run_writes_a_comment_file_and_reports_per_file_pass_fail(monkeypatch, t
     body = comment_path.read_text()
     assert "leapfrog vs Spectrum comparison" in body
     assert "bad.PJNZ" in body
-    assert "good.PJNZ" not in body  # only failed files are listed by name
+    assert "good.PJNZ" in body  # passed files are listed too, in their own collapsible section
 
 
 def test_run_never_prints_a_raw_diff_magnitude(monkeypatch, tmp_path):

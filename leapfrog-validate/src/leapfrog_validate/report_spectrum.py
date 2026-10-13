@@ -19,22 +19,17 @@ and a per-file pass-rate fraction in the comment).
 Testable with synthetic data alone (`tests/test_report_spectrum.py`), per
 the PRD's Testing Decisions -- no R build, no network, no real PJNZ.
 
-**Errored files are excluded from the "% pass" denominator.** A real,
-large-scale live run against this repo's private corpus (ticket 22's own
-live verification, see this ticket's Comments) found most failures there
-were PJNZ that could not be *built or run at all* (a pre-existing
-`leapfrogr::process_pjnz_ha` limitation, same root cause ticket 16's
-Comments already documented on one fixture, here hitting a much larger
-share of the real corpus) -- not a real leapfrog-vs-Spectrum tolerance
-disagreement. Counting those as ordinary "failed" cells made the headline
-percentage ("3% pass") read as a catastrophic model regression when it was
-actually "most of the corpus can't be run under current leapfrogr at all,"
-a completely different, pre-existing problem this ticket didn't introduce
-and isn't positioned to fix. Ticket 21's regression-track comment
-independently hit and fixed the identical conflation on its own real run;
-this module's three-way split (passed / failed / errored, with "% pass"
-computed only over `passed + failed`) mirrors that fix so both tracks'
-comments read the same way for the same underlying distinction.
+**A build/run/classify failure counts as a failed file.** An earlier
+version of this module excluded these ("errored") files from the "% pass"
+denominator entirely, on the reasoning that a pre-existing, PR-unrelated
+`leapfrogr::process_pjnz_ha` limitation (ticket 16's Comments) was being
+conflated with genuine leapfrog-vs-Spectrum tolerance disagreements. That
+reasoning was overridden on request: if the check cannot build or run a
+file, that is itself a real problem worth seeing as a failure on every
+PR, not a number quietly carved out of the headline. A build/run/classify
+failure is still labelled distinctly from a tolerance mismatch (its own
+"could not be compared" reason is shown, not an indicator pass count), but
+it now counts in `n_failed`/the headline pass rate like any other failure.
 """
 
 from __future__ import annotations
@@ -64,11 +59,9 @@ class PjnzResult:
 
     `error`, if set, means the file could not be compared at all (e.g. the
     PJNZ importer rejected it, or leapfrog itself could not be built/run
-    against it) -- reported in its own "could not be compared" category,
-    distinct from a real tolerance failure (same spirit as `compare_cmd`'s
-    `ERROR` line for a `ClassifyError`, and the reason this category is
-    excluded from the "% pass" denominator -- see this module's docstring).
-    `indicators` is empty whenever `error` is set.
+    against it). It still counts as a failure (see this module's
+    docstring) -- `error` only changes how the failure is described, not
+    whether it counts. `indicators` is empty whenever `error` is set.
     """
 
     label: str
@@ -77,7 +70,7 @@ class PjnzResult:
 
     @property
     def errored(self) -> bool:
-        """Whether this file could not be compared at all (build/run/extract failure)."""
+        """Whether this file could not be compared at all (build/run/extract/classify failure)."""
         return self.error is not None
 
     @property
@@ -121,9 +114,9 @@ def _reproduce_command(pjnz_label: str, ref_sha: str) -> str:
     )
 
 
-def _format_entry(result: PjnzResult, ref_sha: str, *, errored: bool) -> str:
-    if errored:
-        lines = [f"- `{result.label}` -- could not be compared ({result.error})"]
+def _format_entry(result: PjnzResult, ref_sha: str) -> str:
+    if result.errored:
+        lines = [f"- `{result.label}` -- could not be compared: {result.error}"]
     else:
         lines = [f"- `{result.label}` -- {result.pass_rate_label} indicators passed"]
     lines.append("  Reproduce:")
@@ -144,16 +137,16 @@ def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> s
     accident -- this text is read by maintainers scanning a PR, not just by
     this module's own tests.
 
-    "% pass" is computed only over files that could actually be compared
-    (`passed + failed`, excluding `errored`) -- see this module's
-    docstring for why a build/run failure must never silently count as a
-    tolerance failure in that headline number.
+    The headline counts every file -- a build/run/classify failure counts
+    as a failed file, same as a genuine tolerance mismatch (see this
+    module's docstring for why). Each failed entry still says *why* it
+    failed, so a build/run failure and a tolerance failure stay
+    distinguishable even though both now count the same way.
     """
-    errored = [r for r in results if r.errored]
-    compared = [r for r in results if not r.errored]
-    failed = [r for r in compared if not r.passed]
-    n_compared = len(compared)
-    n_passed = len(compared) - len(failed)
+    failed = [r for r in results if not r.passed]
+    passed = [r for r in results if r.passed]
+    n_total = len(results)
+    n_passed = len(passed)
 
     lines = [
         f"<!-- {COMMENT_MARKER} -->",
@@ -173,13 +166,9 @@ def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> s
         lines.append(f"Ref: {_display_ref(ref_given, ref_sha)}")
         return "\n".join(lines)
 
-    if n_compared == 0:
-        lines.append("No files could be compared. Every file hit a build or run error.")
-    else:
-        percent_pass = round(100 * n_passed / n_compared)
-        lines.append(f"**Overall: {percent_pass}% pass ({n_passed}/{n_compared} files compared).**")
-    if errored:
-        lines.append(f"{len(errored)} file(s) could not be compared at all, and are not counted in that rate.")
+    status = "PASS" if not failed else "FAIL"
+    percent_pass = round(100 * n_passed / n_total)
+    lines.append(f"**Result: {status} -- {percent_pass}% of files pass ({n_passed}/{n_total}).**")
     lines.append("")
     lines.append(f"Ref: {_display_ref(ref_given, ref_sha)}")
     lines.append("")
@@ -187,23 +176,23 @@ def format_comment(results: list[PjnzResult], ref_given: str, ref_sha: str) -> s
     if failed:
         lines.append("### Failed files")
         lines.append("")
-        lines.append("Each failed file is listed below, with how many of its indicators passed.")
+        lines.append("Each failed file is listed below, with why it failed.")
         lines.append("")
         for result in failed:
-            lines.append(_format_entry(result, ref_sha, errored=False))
+            lines.append(_format_entry(result, ref_sha))
             lines.append("")
-    elif n_compared > 0:
-        lines.append("Every compared file passed.")
+    else:
+        lines.append("Every file passed.")
         lines.append("")
 
-    if errored:
-        lines.append("### Could not be compared")
+    if passed:
+        lines.append("<details>")
+        lines.append(f"<summary>Files that passed ({len(passed)})</summary>")
         lines.append("")
-        lines.append("Each file below hit a build or run error, not a tolerance failure.")
-        lines.append("It is not counted as pass or fail.")
+        for result in passed:
+            lines.append(f"- `{result.label}`")
         lines.append("")
-        for result in errored:
-            lines.append(_format_entry(result, ref_sha, errored=True))
-            lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
