@@ -215,10 +215,11 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
 
   art_dropout_recover_cd4 <- vers_str >= "6.14"
 
-  if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality)) {
-    # This is hardcoding which epp_idu_morality to pass through
-    # it copies Spectrum which is assuming the the first subpop
-    # will be PWID.
+  # This is hardcoding which epp_idu_mortality to pass through -- it copies
+  # Spectrum, which assumes the first subpop will be PWID. EPP can return one
+  # value per risk-group subpopulation (observed length 9 for a Goals-enabled
+  # PJNZ with multiple EPP subpops).
+  if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality[1])) {
     pwid_hivpos_nonaids_mortality <- pars$pwid_hivpos_nonaids_mortality[1]
     if (length(pars$pwid_sex_ratio) < proj_years_count) {
       pwid_sex_ratio <- rep(pars$pwid_sex_ratio, proj_years_count)
