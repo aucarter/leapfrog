@@ -53,8 +53,16 @@ def _axis_mask(size: int, bounds: InclusiveBounds | None) -> np.ndarray:
     return (idx >= lo) & (idx <= hi)
 
 
-def exclusion_mask(shape: tuple[int, int, int], exclusions: Sequence[Exclusion], pjnz: str) -> np.ndarray:
-    """Boolean (year, sex, age) mask, True where a cell is excluded for `pjnz`."""
+def exclusion_mask(shape: tuple[int, ...], exclusions: Sequence[Exclusion], pjnz: str) -> np.ndarray:
+    """Boolean mask, True where a cell is excluded for `pjnz`.
+
+    `shape` is either `(year, sex, age)` or, for a year-only indicator such
+    as `pmtct_need`/`cotrim_need`, just `(year,)`. A year-only indicator has
+    no sex or age axis, so an entry carrying a `sex` or `age` bound is
+    rejected for it rather than silently ignored.
+    """
+    if len(shape) == 1:
+        return _year_only_exclusion_mask(shape[0], exclusions, pjnz)
     n_year, n_sex, n_age = shape
     mask = np.zeros(shape, dtype=bool)
     for excl in exclusions:
@@ -66,4 +74,17 @@ def exclusion_mask(shape: tuple[int, int, int], exclusions: Sequence[Exclusion],
             & _axis_mask(n_age, excl.age)[None, None, :]
         )
         mask |= region
+    return mask
+
+
+def _year_only_exclusion_mask(n_year: int, exclusions: Sequence[Exclusion], pjnz: str) -> np.ndarray:
+    mask = np.zeros(n_year, dtype=bool)
+    for excl in exclusions:
+        if excl.pjnz != pjnz:
+            continue
+        for axis, bounds in (("sex", excl.sex), ("age", excl.age)):
+            if bounds is not None:
+                msg = f"Exclusion for '{pjnz}' sets a {axis} bound, but this indicator has no {axis} axis"
+                raise ValueError(msg)
+        mask |= _axis_mask(n_year, excl.year)
     return mask

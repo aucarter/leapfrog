@@ -17,7 +17,9 @@ from leapfrog_validate.indicators import (
     Scope,
     extract_aids_deaths_on_treatment,
     extract_aids_deaths_single_age,
+    extract_cotrim_need,
     extract_hiv_population,
+    extract_pmtct_need,
     extract_total_population,
     extract_treatment_population,
     tag,
@@ -89,6 +91,24 @@ def test_extract_aids_deaths_on_treatment_sums_cd4_duration_and_concatenates_age
     np.testing.assert_allclose(result[..., :2], 0.25 * 7 * 3)
     np.testing.assert_allclose(result[..., 2:5], 0.1 * 6 * 3)
     np.testing.assert_allclose(result[..., 5:], 0.5 * 7 * 3)
+
+
+def test_extract_pmtct_need_reads_hiv_births_not_the_pmtct_need_output(tmp_path):
+    """Spectrum's `pmtct_need` is total HIV births, not leapfrog's `max(ARV users, births)` output.
+
+    Both datasets are written with different values so the test can only
+    pass by reading `hiv_births` -- the series the migrated hardcoded
+    `testthat` comparison used (see `extract_pmtct_need`'s docstring).
+    """
+    births = np.array([0.0, 10.0, 20.0])
+    output = _write_h5(tmp_path / "output.h5", hiv_births=births, pmtct_need=births + 5.0)
+    np.testing.assert_array_equal(extract_pmtct_need(output), births)
+
+
+def test_extract_cotrim_need_reads_cotrim_need(tmp_path):
+    need = np.array([0.0, 3.0, 7.0])
+    output = _write_h5(tmp_path / "output.h5", cotrim_need=need)
+    np.testing.assert_array_equal(extract_cotrim_need(output), need)
 
 
 def test_registry_has_all_five_blessed_indicators():

@@ -59,3 +59,16 @@ def test_exclusion_mask_year_and_sex_axes_are_independently_filterable():
     assert mask[1, 0, :].all()
     assert not mask[0, :, :].any()
     assert not mask[1, 1, :].any()
+
+
+def test_exclusion_mask_supports_a_year_only_indicator():
+    """Year-only indicators (`pmtct_need`, `cotrim_need`) have no sex or age axis."""
+    excl = Exclusion(pjnz="kenya", reason="r", link="l", year=(1, 2))
+    mask = exclusion_mask((4,), [excl], pjnz="kenya")
+    assert mask.tolist() == [False, True, True, False]
+
+
+def test_exclusion_mask_rejects_a_sex_or_age_bound_on_a_year_only_indicator():
+    excl = Exclusion(pjnz="kenya", reason="r", link="l", age=(0, 0))
+    with pytest.raises(ValueError, match="no age axis"):
+        exclusion_mask((4,), [excl], pjnz="kenya")

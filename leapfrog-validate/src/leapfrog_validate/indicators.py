@@ -10,14 +10,18 @@ Three indicators read a single output.h5 array directly; the other two
 array and are reconstructed by summing the adult (`h_`) and child
 (`hc1_`/`hc2_`) arrays over CD4/duration and concatenating their age domains.
 
-All extracted arrays share one (year, sex, age=81) shape, which
-`leapfrog_validate.exclusions.exclusion_mask` relies on.
+The five blessed indicators share one (year, sex, age=81) shape, which
+`leapfrog_validate.exclusions.exclusion_mask` relies on. The two year-only
+indicators (`extract_pmtct_need`, `extract_cotrim_need`) are (year,) arrays;
+`exclusion_mask` accepts both shapes.
 
 `Scope` restricts which PJNZ (by tag, as computed by `classify.classify`) an
 indicator runs against -- the five blessed indicators default to `ALL` (every
 PJNZ, unchanged behavior); a custom indicator can instead use `tag("some_tag")`
 to run only where it's meaningful (ticket 20's acceptance case), e.g. the
-`pmtct_need`/`cotrim_need` migration ticket 23 plans.
+`pmtct_need`/`cotrim_need` entries ticket 23 added to `SPECTRUM_INDICATORS`
+(`leapfrog_validate.spectrum_indicators`). Those two are not in the
+regression-track `INDICATORS` below.
 """
 
 from collections.abc import Callable
@@ -103,6 +107,30 @@ def extract_treatment_population(output_h5: Path) -> np.ndarray:
 def extract_aids_deaths_on_treatment(output_h5: Path) -> np.ndarray:
     """Sum h_hiv_deaths_art + hc1_art_aids_deaths + hc2_art_aids_deaths -> (year, sex, age=81)."""
     return _extract_summed_by_age_domain(output_h5, "h_hiv_deaths_art", "hc1_art_aids_deaths", "hc2_art_aids_deaths")
+
+
+def extract_pmtct_need(output_h5: Path) -> np.ndarray:
+    """Read `hiv_births` (year,) out of a raw output.h5 -- the leapfrog side of `pmtct_need`.
+
+    Spectrum's "mothers needing PMTCT" is total HIV births, so this reads
+    leapfrog's `hiv_births` rather than its own `pmtct_need` output, which
+    is `max(ARV users, hiv_births)` and so can exceed Spectrum's series.
+    This is the series the hardcoded `test-child-model.R` comparison used,
+    and the pairing Avenir's own leapfrog-to-modvars mapping uses
+    (`SpectrumCommon.Util.LeapfrogDataMapping`: `AM_ChildNeedPMTCT = hiv_births`).
+    Year-only: no sex or age axis, unlike the five blessed indicators.
+    """
+    with h5py.File(output_h5, "r") as f:
+        return f["hiv_births"][()]
+
+
+def extract_cotrim_need(output_h5: Path) -> np.ndarray:
+    """Read the `cotrim_need` array (year,) -- children aged 0-14 needing cotrimoxazole.
+
+    Year-only: no sex or age axis, unlike the five blessed indicators.
+    """
+    with h5py.File(output_h5, "r") as f:
+        return f["cotrim_need"][()]
 
 
 @dataclass(frozen=True)
