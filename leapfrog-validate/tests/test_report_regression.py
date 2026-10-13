@@ -15,6 +15,7 @@ pattern `test_cli_compare.py` already established.
 import re
 
 from leapfrog_validate.report_regression import (
+    IndicatorOutcome,
     PjnzRegressionResult,
     RegressionReport,
     ResolvedRef,
@@ -149,7 +150,7 @@ class TestRenderCommentWithFailures:
         assert "ETH/bad.PJNZ" in self.markdown
         # Passed files are listed too, in their own collapsible section --
         # not hidden entirely, so "100%"/"50%" etc. is backed by named files.
-        assert "<summary>Files that passed (1)</summary>" in self.markdown
+        assert "<summary>✅ Succeeded files (1)</summary>" in self.markdown
         assert "good.PJNZ" in self.markdown
 
     def test_failed_file_shows_its_own_pass_rate(self):
@@ -191,6 +192,61 @@ class TestRenderCommentEdgeCases:
         assert "PASS" in markdown
 
 
+class TestRenderCommentToleranceAndIndicators:
+    def test_states_the_actual_tolerance_not_just_tight(self):
+        markdown = render_comment(_report(()))
+        assert "tight tolerance" not in markdown
+        assert "1e-6" in markdown
+
+    def test_lists_the_indicators_checked_with_their_tolerance(self):
+        markdown = render_comment(_report(()))
+        assert "Indicators checked (5)" in markdown
+        assert "total_population" in markdown
+        assert "hiv_population" in markdown
+        assert "treatment_population" in markdown
+        assert "aids_deaths_single_age" in markdown
+        assert "aids_deaths_on_treatment" in markdown
+        assert "1e-3" in markdown
+        assert "1e-4" in markdown
+
+
+class TestRenderCommentSucceededFilesSectionOrderAndTicks:
+    def setup_method(self):
+        self.report = _report(
+            (
+                PjnzRegressionResult(
+                    label="good.PJNZ",
+                    n_passed=5,
+                    n_applicable=5,
+                    indicators=(
+                        IndicatorOutcome(name="total_population", passed=True),
+                        IndicatorOutcome(name="hiv_population", passed=True),
+                    ),
+                ),
+                PjnzRegressionResult(
+                    label="mixed.PJNZ",
+                    n_passed=1,
+                    n_applicable=2,
+                    indicators=(
+                        IndicatorOutcome(name="total_population", passed=True),
+                        IndicatorOutcome(name="hiv_population", passed=False),
+                    ),
+                ),
+            )
+        )
+        self.markdown = render_comment(self.report)
+
+    def test_succeeded_files_section_is_collapsed_and_comes_before_failed_files(self):
+        succeeded_pos = self.markdown.index("<summary>✅ Succeeded files")
+        failed_pos = self.markdown.index("### ❌ Failed files")
+        assert succeeded_pos < failed_pos
+        assert "good.PJNZ" in self.markdown
+
+    def test_failed_entry_shows_a_tick_or_cross_per_indicator(self):
+        assert "✅ total_population" in self.markdown
+        assert "❌ hiv_population" in self.markdown
+
+
 class TestRenderCommentErroredFilesCountAsFailures:
     """An `errored` file (a build/run/classify failure) counts as a failure.
 
@@ -227,7 +283,7 @@ class TestRenderCommentErroredFilesCountAsFailures:
         assert "FAIL" in self.markdown
 
     def test_errored_files_are_listed_under_failed_files_with_their_reason(self):
-        assert "### Failed files" in self.markdown
+        assert "### ❌ Failed files" in self.markdown
         assert "broken_a.PJNZ" in self.markdown
         assert "boom a" in self.markdown
         assert "broken_b.PJNZ" in self.markdown
@@ -261,7 +317,7 @@ class TestRenderCommentGenuineFailureStillReported:
         assert "0% of files pass (0/2)" in self.markdown
 
     def test_both_failures_present_and_distinguishable(self):
-        assert "### Failed files" in self.markdown
+        assert "### ❌ Failed files" in self.markdown
         assert "regressed.PJNZ" in self.markdown
         assert "40%" in self.markdown  # 2/5 indicators
         assert "broken.PJNZ" in self.markdown

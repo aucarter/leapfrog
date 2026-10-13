@@ -38,11 +38,14 @@ import sys
 import tempfile
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from leapfrog_validate import classify, cli, git_utils, manifest
 from leapfrog_validate.subprocess_utils import summarize_error_reason
+
+_PASS_MARK = "✅"
+_FAIL_MARK = "❌"
 
 # Identifies this track to `marocchino/sticky-pull-request-comment`'s
 # `header:` input, so its find-or-update marker never collides with the
@@ -90,14 +93,27 @@ class ResolvedRef:
 
 
 @dataclass(frozen=True)
+class IndicatorOutcome:
+    """One indicator's pass/fail verdict for one PJNZ -- no magnitude, by design."""
+
+    name: str
+    passed: bool
+
+
+@dataclass(frozen=True)
 class PjnzRegressionResult:
     """One PJNZ file's regression-track result, already rolled up to indicator counts.
 
     Deliberately carries no magnitude (no `max_abs_diff`, no cell counts)
-    -- only how many of its applicable indicators passed. That's exactly
-    the finest grain this track's reporting is allowed to surface; the
-    actual diff values live only in the `Verdict` objects this is built
-    from, which `compute_regression_report` never logs or returns.
+    -- `indicators` only carries each applicable indicator's name and
+    whether it passed. That's exactly the finest grain this track's
+    reporting is allowed to surface; the actual diff values live only in
+    the `Verdict` objects this is built from, which
+    `compute_regression_report` never logs or returns. `n_passed`/
+    `n_applicable` are kept as their own fields (redundant with
+    `indicators` where it's populated) rather than derived, so an errored
+    file -- which has no `indicators` to derive from -- still reports
+    `0/0` without a special case.
 
     `errored` distinguishes "could not be compared at all" (a classify or
     build/run failure, e.g. a pre-existing leapfrogr data-compatibility
@@ -127,6 +143,7 @@ class PjnzRegressionResult:
     n_applicable: int
     errored: bool = False
     error_reason: str | None = None
+    indicators: tuple[IndicatorOutcome, ...] = field(default_factory=tuple)
 
     @property
     def passed(self) -> bool:
@@ -228,6 +245,48 @@ def _reproduce_command_lines(ref_sha: str, candidate_sha: str, label: str, confi
     ]
 
 
+def _format_number(value: float) -> str:
+    """Render a tolerance constant compactly, with no literal decimal point.
+
+    Whole numbers render as plain integers; fractional values render as
+    bare scientific notation (`1e-3`, not `1.0e-03`). A decimal point here
+    would look exactly like a diff magnitude to a reader skimming the
+    comment even though this is a static, public tolerance config value,
+    not a computed result -- avoiding it keeps that distinction visible
+    at a glance, not just true in principle.
+    """
+    if value == int(value):
+        return str(int(value))
+    mantissa, _, exponent = f"{value:.0e}".partition("e")
+    return f"{mantissa}e{int(exponent)}"
+
+
+def _indicators_checked_section() -> list[str]:
+    """Render the static "indicators checked" collapsible section.
+
+    Lists every indicator this track's registry defines, with its own
+    atol (the fixed amount a cell is allowed to differ by) -- rtol is
+    uniform across all of them (ticket 07's Answer) and stated once in
+    the prose above this section instead of repeated per row. This is
+    registry metadata, not a per-run result -- unaffected by which files
+    actually got compared.
+    """
+    registry = cli.indicators.INDICATORS
+    lines = [
+        "<details>",
+        f"<summary>Indicators checked ({len(registry)})</summary>",
+        "",
+        "| Indicator | Fixed amount (atol) |",
+        "|---|---|",
+    ]
+    for name in sorted(registry):
+        atol = registry[name]["tolerance"].atol
+        lines.append(f"| `{name}` | {_format_number(atol)} |")
+    lines.append("")
+    lines.append("</details>")
+    return lines
+
+
 def render_comment(report: RegressionReport) -> str:
     """Render `report` as the regression track's sticky-comment markdown.
 
@@ -245,24 +304,48 @@ def render_comment(report: RegressionReport) -> str:
     same as a genuine indicator mismatch -- see `PjnzRegressionResult`'s
     docstring for why. It still gets its own distinct wording (the actual
     error reason, not an indicator pass count) so the two stay visually
-    distinguishable even though both now count the same way. Passed files
-    are listed too, in a collapsible section, so a "100% pass" headline is
-    backed by named files rather than an unverifiable number.
+    distinguishable even though both now count the same way.
+
+    Layout, top to bottom: headline, ref, the tolerance this track checks
+    against, a collapsed "Succeeded files" section (so a scan of the
+    comment sees the good news first), then "Failed files" with full
+    per-indicator detail. ✅/❌ marks are a readability aid only -- the
+    underlying pass/fail boolean they stand for is unchanged.
     """
     lines = [
         "## leapfrog vs leapfrog regression",
         "",
         f"This check compares `{report.ref.display()}` against `{report.candidate.display()}`.",
-        "It runs the full PJNZ corpus. It uses a tight tolerance.",
+        "It runs the full PJNZ corpus.",
         "",
     ]
 
+    status_mark = _PASS_MARK if report.overall_passed else _FAIL_MARK
     status = "PASS" if report.overall_passed else "FAIL"
     pct = round(report.overall_pass_rate * 100)
     n_total = len(report.results)
     n_passed = len(report.passed_results)
-    lines.append(f"**Result: {status} -- {pct}% of files pass ({n_passed}/{n_total}).**")
+    lines.append(f"**Result: {status_mark} {status} -- {pct}% of files pass ({n_passed}/{n_total}).**")
     lines.append("")
+    rtol_display = _format_number(cli.indicators.RTOL)
+    lines.append(
+        f"A value counts as matching if it is within {rtol_display} times the reference value, "
+        "plus a small fixed amount. The fixed amount is different for each indicator."
+    )
+    lines.append("")
+    lines.extend(_indicators_checked_section())
+    lines.append("")
+
+    passed = report.passed_results
+    if passed:
+        lines.append("<details>")
+        lines.append(f"<summary>{_PASS_MARK} Succeeded files ({len(passed)})</summary>")
+        lines.append("")
+        for result in passed:
+            lines.append(f"- `{result.label}`")
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
 
     failed = report.failed_results
     genuine_failed = [r for r in failed if not r.errored]
@@ -271,13 +354,16 @@ def render_comment(report: RegressionReport) -> str:
         lines.append("All files passed.")
         lines.append("")
     else:
-        lines.append("### Failed files")
+        lines.append(f"### {_FAIL_MARK} Failed files")
         lines.append("")
         lines.append("These files were compared. They did not pass.")
         lines.append("")
         for result in genuine_failed:
             file_pct = round(result.pass_rate * 100)
             lines.append(f"- `{result.label}` -- {file_pct}% pass ({result.n_passed}/{result.n_applicable} indicators)")
+            for outcome in result.indicators:
+                mark = _PASS_MARK if outcome.passed else _FAIL_MARK
+                lines.append(f"  - {mark} {outcome.name}")
             lines.append("")
             lines.extend(_reproduce_details_block(report, result.label))
             lines.append("")
@@ -287,17 +373,6 @@ def render_comment(report: RegressionReport) -> str:
             lines.append("")
             lines.extend(_reproduce_details_block(report, result.label))
             lines.append("")
-
-    passed = report.passed_results
-    if passed:
-        lines.append("<details>")
-        lines.append(f"<summary>Files that passed ({len(passed)})</summary>")
-        lines.append("")
-        for result in passed:
-            lines.append(f"- `{result.label}`")
-        lines.append("")
-        lines.append("</details>")
-        lines.append("")
 
     lines.append("---")
     lines.append("This check never shows real numbers. It only shows pass or fail, and file names.")
@@ -464,7 +539,12 @@ def compute_regression_report(  # noqa: PLR0913
                 )
                 continue
             n_passed = sum(1 for v in verdicts if v.passed)
-            results.append(PjnzRegressionResult(label=label, n_passed=n_passed, n_applicable=len(verdicts)))
+            indicator_outcomes = tuple(IndicatorOutcome(name=v.indicator, passed=v.passed) for v in verdicts)
+            results.append(
+                PjnzRegressionResult(
+                    label=label, n_passed=n_passed, n_applicable=len(verdicts), indicators=indicator_outcomes
+                )
+            )
             log(f"{'PASS' if n_passed == len(verdicts) else 'FAIL'} {label}")
 
     return RegressionReport(
