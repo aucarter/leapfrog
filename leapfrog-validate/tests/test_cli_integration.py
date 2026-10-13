@@ -193,17 +193,16 @@ def test_domain_tags_for_aim_only_fixtures(head_workspace, pjnz):
 
 
 @requires_r
-def test_domain_tags_raises_for_goals_fixture_with_current_process_pjnz_limitation(head_workspace):
-    """Regression-locking, not a desired outcome.
+def test_domain_tags_for_goals_fixture(head_workspace):
+    """Ground truth verified empirically, now that `process_pjnz_ha`'s bug is fixed.
 
-    `leapfrog::process_pjnz()` currently errors on this Goals-enabled PJNZ
-    inside `process_pjnz_ha` (unrelated to this classifier -- see ticket
-    16's comments). `domain_tags` surfaces that as `ClassifyError` rather
-    than guessing tags, which is the correct behaviour either way; this
-    pins down that it fails loudly instead of silently.
+    This PJNZ used to raise `ClassifyError` because `process_pjnz()` itself
+    errored inside `process_pjnz_ha` on any PJNZ where EPP returns more than
+    one PWID-subpopulation value for `pwid_hivpos_nonaids_mortality` (see
+    `process_pjnz_ha.R`'s fix). Locked down here as a real regression test:
+    this must keep succeeding.
     """
-    with pytest.raises(classify.ClassifyError):
-        classify.domain_tags(head_workspace, GOALS_FIXTURE)
+    assert classify.domain_tags(head_workspace, GOALS_FIXTURE) == frozenset({"has_pmtct", "has_cotrim"})
 
 
 @requires_r
