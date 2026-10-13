@@ -325,7 +325,7 @@ def _safe_relative_blob_path(blob_name: str, prefix_dir: str) -> PurePosixPath:
     return rel
 
 
-def _resolve_corpus_files(
+def _resolve_corpus_files_core(
     pjnz_dir: Path | None,
     azure_container: str | None,
     azure_account: str | None,
@@ -334,10 +334,15 @@ def _resolve_corpus_files(
 ) -> tuple[list[Path], Path]:
     """Resolve the PJNZ source (local dir or Azure Blob) to its files + corpus root.
 
-    Exits (`typer.Exit(2)`) if the resolved corpus is empty. Reports the
-    account/container/prefix rather than the Azure branch's ephemeral temp
-    dir path in that message, since the latter means nothing to a reader
-    once this process exits.
+    Raises `CorpusError` (never `typer.Exit`, unlike the thin `typer`-facing
+    wrapper below) if the resolved corpus is empty or an unsafe blob path is
+    hit -- a plain, `typer`-independent core so `report_regression.py`
+    (ticket 21) can call it directly instead of duplicating this logic
+    (extracted during that ticket's build after code review flagged the
+    near-line-for-line duplicate). Reports the account/container/prefix
+    rather than the Azure branch's ephemeral temp dir path in the
+    empty-corpus message, since the latter means nothing to a reader once
+    this process exits.
     """
     if azure_container is not None:
         corpus_root = tmp_path / "azure-corpus"
@@ -345,13 +350,6 @@ def _resolve_corpus_files(
         blob_service_client = _azure_blob_service_client(azure_account)
         try:
             pjnz_files = _download_azure_pjnz_corpus(blob_service_client, azure_container, azure_prefix, corpus_root)
-        except CorpusError as e:
-            # A malformed/unsafe blob name should never reach the corpus in
-            # practice (ticket 16's upload path controls the layout), but
-            # this is still a validation failure the user should see as a
-            # clean error, not a raw traceback.
-            typer.echo(str(e), err=True)
-            raise typer.Exit(2) from e
         finally:
             # Belt-and-suspenders: close the client and the credential it
             # holds explicitly, rather than relying on either the SDK's own
@@ -367,9 +365,30 @@ def _resolve_corpus_files(
         corpus_description = str(corpus_root)
 
     if not pjnz_files:
-        typer.echo(f"No PJNZ files found in {corpus_description}", err=True)
-        raise typer.Exit(2)
+        msg = f"No PJNZ files found in {corpus_description}"
+        raise CorpusError(msg)
     return pjnz_files, corpus_root
+
+
+def _resolve_corpus_files(
+    pjnz_dir: Path | None,
+    azure_container: str | None,
+    azure_account: str | None,
+    azure_prefix: str,
+    tmp_path: Path,
+) -> tuple[list[Path], Path]:
+    """`typer`-facing wrapper around `_resolve_corpus_files_core`.
+
+    Converts any `CorpusError` (a malformed/unsafe blob name, per ticket
+    16's upload path controlling layout -- never expected in practice but
+    not trusted blindly either; or an empty corpus) into a clean CLI error
+    (`typer.Exit(2)`) rather than a raw traceback.
+    """
+    try:
+        return _resolve_corpus_files_core(pjnz_dir, azure_container, azure_account, azure_prefix, tmp_path)
+    except CorpusError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2) from e
 
 
 @dataclass(frozen=True)
