@@ -29,6 +29,11 @@ def _fake_prepare_ref(repo_root: Path, cache_dir: Path, ref: str) -> BuildWorksp
     return BuildWorkspace(worktree=worktree, r_library=worktree / "r-library")
 
 
+def _fake_classify_untagged(workspace: BuildWorkspace, pjnz: Path) -> frozenset[str]:
+    del workspace, pjnz
+    return frozenset()
+
+
 def _fake_build_params(workspace: BuildWorkspace, pjnz: Path, output: Path) -> None:
     del workspace, pjnz, output
 
@@ -48,6 +53,10 @@ def fake_build_and_run(monkeypatch):
     monkeypatch.setattr(spectrum_track, "_prepare_ref", _fake_prepare_ref)
     monkeypatch.setattr(params_module, "build_params", _fake_build_params)
     monkeypatch.setattr(model_run_module, "run_model", _fake_run_model)
+    # `pmtct_need`/`cotrim_need` are tag-scoped, so every run now classifies each
+    # PJNZ. These fixtures are empty files; default them to "no tags" (only the
+    # five unscoped indicators apply). Tests of tagged files override this.
+    monkeypatch.setattr(spectrum_track.classify, "classify", _fake_classify_untagged)
 
 
 def test_diff_one_passes_when_every_indicator_passes(monkeypatch, tmp_path):
@@ -300,3 +309,115 @@ def test_run_skips_a_tag_scoped_indicator_for_an_untagged_pjnz(monkeypatch, tmp_
     assert result.exit_code == 0, result.output
     assert "SKIP  custom_need" in result.output
     assert "PASS  custom_need" not in result.output
+
+
+def _recording_diff(ran: list[str], failing: frozenset[str] = frozenset(), magnitude: float = 0.0):
+    def fake_diff(name, output_h5, pjnz, pjnz_label=None):  # noqa: ARG001
+        ran.append(name)
+        passed = name not in failing
+        return Verdict(indicator=name, passed=passed, max_abs_diff=magnitude, n_cells=61, n_failed=0 if passed else 3)
+
+    return fake_diff
+
+
+def _one_file_corpus(tmp_path: Path, name: str = "a.PJNZ") -> Path:
+    pjnz_dir = tmp_path / "corpus"
+    pjnz_dir.mkdir()
+    (pjnz_dir / name).touch()
+    return pjnz_dir
+
+
+def _classify_as(*tags: str):
+    return lambda workspace, pjnz: frozenset(tags)  # noqa: ARG005
+
+
+def test_run_checks_pmtct_and_cotrim_need_for_a_tagged_pjnz_and_shows_them_in_the_comment(monkeypatch, tmp_path):
+    ran: list[str] = []
+    failing = frozenset({"pmtct_need"})
+    monkeypatch.setattr(spectrum_track, "diff_spectrum_indicator", _recording_diff(ran, failing=failing))
+    monkeypatch.setattr(spectrum_track.classify, "classify", _classify_as("has_pmtct", "has_cotrim"))
+    comment_path = tmp_path / "comment.md"
+
+    result = runner.invoke(
+        app, ["run", "main", "--pjnz-dir", str(_one_file_corpus(tmp_path)), "--comment-out", str(comment_path)]
+    )
+
+    assert {"pmtct_need", "cotrim_need"} <= set(ran)
+    assert "FAIL  pmtct_need" in result.output
+    assert "PASS  cotrim_need" in result.output
+    body = comment_path.read_text()
+    assert "❌ pmtct_need" in body
+    assert "✅ cotrim_need" in body
+    assert "6/7 indicators passed" in body
+
+
+def test_run_silently_skips_pmtct_and_cotrim_need_for_an_untagged_pjnz(monkeypatch, tmp_path):
+    ran: list[str] = []
+    monkeypatch.setattr(
+        spectrum_track, "diff_spectrum_indicator", _recording_diff(ran, failing=frozenset({"hiv_population"}))
+    )
+    comment_path = tmp_path / "comment.md"
+
+    result = runner.invoke(
+        app, ["run", "main", "--pjnz-dir", str(_one_file_corpus(tmp_path)), "--comment-out", str(comment_path)]
+    )
+
+    assert "pmtct_need" not in ran
+    assert "cotrim_need" not in ran
+    assert "PASS  pmtct_need" not in result.output
+    assert "FAIL  pmtct_need" not in result.output
+    body = comment_path.read_text()
+    # No pass/fail entry for the skipped indicators; the file is judged on the five that ran.
+    for name in ("pmtct_need", "cotrim_need"):
+        assert f"✅ {name}" not in body
+        assert f"❌ {name}" not in body
+    assert "4/5 indicators passed" in body
+
+
+def test_run_applies_each_need_indicator_only_to_its_own_tag(monkeypatch, tmp_path):
+    ran: list[str] = []
+    monkeypatch.setattr(spectrum_track, "diff_spectrum_indicator", _recording_diff(ran))
+    monkeypatch.setattr(spectrum_track.classify, "classify", _classify_as("has_pmtct"))
+
+    result = runner.invoke(
+        app,
+        ["run", "main", "--pjnz-dir", str(_one_file_corpus(tmp_path)), "--comment-out", str(tmp_path / "c.md")],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "pmtct_need" in ran
+    assert "cotrim_need" not in ran
+
+
+def test_run_never_prints_a_raw_diff_magnitude_for_the_tagged_indicators(monkeypatch, tmp_path):
+    ran: list[str] = []
+    failing = frozenset({"pmtct_need", "cotrim_need"})
+    monkeypatch.setattr(
+        spectrum_track, "diff_spectrum_indicator", _recording_diff(ran, failing=failing, magnitude=24680.13579)
+    )
+    monkeypatch.setattr(spectrum_track.classify, "classify", _classify_as("has_pmtct", "has_cotrim"))
+    comment_path = tmp_path / "comment.md"
+
+    result = runner.invoke(
+        app, ["run", "main", "--pjnz-dir", str(_one_file_corpus(tmp_path)), "--comment-out", str(comment_path)]
+    )
+
+    assert "24680" not in result.output
+    assert "13579" not in result.output
+    assert "24680" not in comment_path.read_text()
+
+
+def test_diff_one_checks_the_need_indicators_for_a_tagged_pjnz_and_skips_them_otherwise(monkeypatch, tmp_path):
+    ran: list[str] = []
+    monkeypatch.setattr(spectrum_track, "diff_spectrum_indicator", _recording_diff(ran))
+    pjnz = tmp_path / "a.PJNZ"
+    pjnz.touch()
+
+    untagged = runner.invoke(app, ["diff-one", "main", str(pjnz)])
+    assert "pmtct_need" not in ran
+    assert "SKIP  pmtct_need" in untagged.output
+
+    monkeypatch.setattr(spectrum_track.classify, "classify", _classify_as("has_pmtct", "has_cotrim"))
+    tagged = runner.invoke(app, ["diff-one", "main", str(pjnz)])
+    assert "PASS  pmtct_need" in tagged.output
+    assert "PASS  cotrim_need" in tagged.output

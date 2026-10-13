@@ -323,40 +323,9 @@ test_that("Female 15-49y pop aligns", {
   expect_true(all(abs(dt$diff) < 1e-3))
 })
 
-test_that("Mothers that need ptmct align", {
-  parameters <- read_parameters(test_path("testdata/child_parms_full.h5"))
-  utils <- readRDS(test_path("testdata/child_test_utils.rds"))
-
-  dp <- utils$dp
-  pjnz <- utils$pjnz
-
-  out <- run_model(parameters, "ChildModel", 1970:2030)
-  spec <- SpectrumUtils::dp.output.pmtct.need(dp, direction = 'long')
-
-  lfrog <- data.frame(lfrog = out$hiv_births, Year = 1970:2030)
-
-  dt <- dplyr::right_join(spec, lfrog, by = c("Year"))
-  dt <- dt %>%
-    dplyr::mutate(diff = Value - lfrog)
-
-  expect_true(all(abs(dt$diff) < 1e-3))
-})
-
-test_that("Children in need of cotrim aligns", {
-  parameters <- read_parameters(test_path("testdata/child_parms_full.h5"))
-  utils <- readRDS(test_path("testdata/child_test_utils.rds"))
-
-  out <- run_model(parameters, "ChildModel", 1970:2030)
-
-  spec <- utils$cotrim_need
-  dt <- data.frame(year = 1970:2030,
-                   spec = as.numeric(unlist(spec)),
-                   lfrog = out$cotrim_need)
-  dt <- dt %>%
-    dplyr::mutate(diff = spec - lfrog)
-
-  expect_true(all(abs(dt$diff) < 5e-1))
-})
+# The Spectrum comparisons for `pmtct_need` and `cotrim_need` live in the
+# leapfrog-validate indicator registry (leapfrog-validate/src/leapfrog_validate/
+# spectrum_indicators.py), scoped to PJNZ files tagged `has_pmtct`/`has_cotrim`.
 
 test_that("Infections among children align", {
   parameters <- read_parameters(test_path("testdata/child_parms_full.h5"))

@@ -17,6 +17,7 @@ Two tiers, mirroring `test_cli_integration.py`'s split:
 import importlib.util
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -27,9 +28,12 @@ from leapfrog_validate.indicators import extract_total_population
 from leapfrog_validate.spectrum_extract import (
     SpectrumExtractError,
     _align_to_leapfrog_years,
+    _read_raw_dp_cotrim_row,
     extract_spectrum_aids_deaths_on_treatment,
     extract_spectrum_aids_deaths_single_age,
+    extract_spectrum_cotrim_need,
     extract_spectrum_hiv_population,
+    extract_spectrum_pmtct_need,
     extract_spectrum_total_population,
     extract_spectrum_treatment_population,
 )
@@ -130,6 +134,86 @@ def test_a_pjnz_whose_years_dont_cover_the_leapfrog_window_is_rejected(tmp_path)
         _align_to_leapfrog_years(arr, first_year=2020, final_year=2024, pjnz=tmp_path / "fake.PJNZ")
 
 
+@requires_avenir
+def test_pmtct_need_is_year_only_and_matches_the_value_stored_in_the_dp():
+    """Compare against a literal read straight from the PJNZ's `<ChildNeedPMTCT MV>` row.
+
+    1680.59277 is the 20th value (1989) of that row in the BWA fixture's
+    `.DP` file, found by reading the raw file, not by calling the
+    extractor under test.
+    """
+    arr = extract_spectrum_pmtct_need(BWA_NUMPMTCT_PJNZ)
+    assert arr.shape == (61,)
+    assert arr[0] == 0.0
+    assert arr[19] == pytest.approx(1680.59277, rel=1e-6)
+
+
+@requires_avenir
+def test_pmtct_need_is_aligned_to_the_leapfrog_window_for_a_longer_pjnz():
+    assert extract_spectrum_pmtct_need(FRANCE_PJNZ).shape == (61,)
+
+
+@requires_avenir
+def test_cotrim_need_is_year_only_and_matches_the_value_stored_in_the_dp():
+    """The avenir importer leaves `AM_ChildNeedCotrim_V1` all zero, so this reads the raw `.DP`.
+
+    3006.59082 is the 20th value (1989) of the "Children needing
+    cotrimoxazole (0-14)" both-sexes row in the BWA fixture's
+    `<ChildARTCalc MV2>` block, found by reading the raw file.
+    """
+    arr = extract_spectrum_cotrim_need(BWA_NUMPMTCT_PJNZ)
+    assert arr.shape == (61,)
+    assert arr[0] == 0.0
+    assert arr[19] == pytest.approx(3006.59082, rel=1e-6)
+
+
+@requires_avenir
+def test_cotrim_need_is_aligned_to_the_leapfrog_window_for_a_longer_pjnz():
+    arr = extract_spectrum_cotrim_need(FRANCE_PJNZ)
+    assert arr.shape == (61,)
+    assert arr.max() > 0
+
+
+def _write_pjnz_with_dp(path: Path, dp_text: str) -> Path:
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("fake.DP", dp_text)
+    return path
+
+
+def test_raw_dp_cotrim_row_is_read_from_the_both_sexes_needing_cotrim_row(tmp_path):
+    dp = (
+        "<Other MV>,,\n"
+        "<ChildARTCalc MV2>,,,\n"
+        ",,,\n"
+        ",<Value>,,\n"
+        ",Children needing cotrimoxazole (0-14),,1.5,2.5,3.5\n"
+        ",,,9,9,9\n"
+        ",,,8,8,8\n"
+    )
+    row = _read_raw_dp_cotrim_row(_write_pjnz_with_dp(tmp_path / "a.PJNZ", dp))
+    assert row.tolist() == [1.5, 2.5, 3.5]
+
+
+def test_raw_dp_cotrim_row_raises_clearly_when_the_block_is_missing(tmp_path):
+    pjnz = _write_pjnz_with_dp(tmp_path / "a.PJNZ", "<Other MV>,,\n")
+    with pytest.raises(SpectrumExtractError, match="ChildARTCalc"):
+        _read_raw_dp_cotrim_row(pjnz)
+
+
+def test_raw_dp_cotrim_row_raises_clearly_when_the_row_is_not_the_cotrim_need_row(tmp_path):
+    dp = "<ChildARTCalc MV2>,,,\n,,,\n,<Value>,,\n,Something else entirely,,1,2\n"
+    with pytest.raises(SpectrumExtractError, match="cotrimoxazole"):
+        _read_raw_dp_cotrim_row(_write_pjnz_with_dp(tmp_path / "a.PJNZ", dp))
+
+
+def test_raw_dp_cotrim_row_raises_clearly_when_the_pjnz_has_no_dp_file(tmp_path):
+    pjnz = tmp_path / "a.PJNZ"
+    with zipfile.ZipFile(pjnz, "w") as z:
+        z.writestr("fake.PJN", "x")
+    with pytest.raises(SpectrumExtractError, match=r"\.DP"):
+        _read_raw_dp_cotrim_row(pjnz)
+
+
 @pytest.fixture(scope="module")
 def head_sha_e2e():
     return git_utils.resolve_ref(REPO_ROOT, "HEAD")
@@ -209,6 +293,23 @@ def test_total_population_passes_within_tolerance_for_the_same_known_divergent_p
     output = _output_h5_for(head_workspace_e2e, BWA_NUMPMTCT_PJNZ, tmp_path, "bwa3")
     verdict = diff_spectrum_indicator("total_population", output, BWA_NUMPMTCT_PJNZ)
     assert verdict.passed
+
+
+@requires_r
+@requires_avenir
+@pytest.mark.parametrize("name", ["pmtct_need", "cotrim_need"])
+def test_migrated_need_indicators_pass_for_the_pjnz_the_old_testthat_comparison_covered(
+    name, head_workspace_e2e, tmp_path
+):
+    """Ticket 23: same verdict (pass) as the `test-child-model.R` comparisons they replaced.
+
+    Those tests ran this exact PJNZ and passed. This is the real
+    leapfrog build, real avenir import, and the real registry entry.
+    """
+    output = _output_h5_for(head_workspace_e2e, BWA_NUMPMTCT_PJNZ, tmp_path, f"bwa-{name}")
+    verdict = diff_spectrum_indicator(name, output, BWA_NUMPMTCT_PJNZ)
+    assert verdict.passed
+    assert verdict.n_cells == 61
 
 
 @requires_r

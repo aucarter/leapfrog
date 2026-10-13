@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from leapfrog_validate.indicators import Scope
 from leapfrog_validate.spectrum_indicators import SPECTRUM_INDICATORS, SPECTRUM_RTOL
 
 # Hidden-marker convention for `marocchino/sticky-pull-request-comment`'s
@@ -112,6 +113,14 @@ def _format_number(value: float) -> str:
     return f"{mantissa}e{int(exponent)}"
 
 
+def _describe_scope(scope: Scope) -> str:
+    """Say which files an indicator runs on. A tag-scoped indicator is skipped, silently, for other files."""
+    if scope.tags is None:
+        return "All files"
+    tags = " and ".join(f"`{t}`" for t in sorted(scope.tags))
+    return f"Files tagged {tags}"
+
+
 def _indicators_checked_section() -> list[str]:
     """Render the static "indicators checked" collapsible section.
 
@@ -126,12 +135,12 @@ def _indicators_checked_section() -> list[str]:
         "<details>",
         f"<summary>Indicators checked ({len(SPECTRUM_INDICATORS)})</summary>",
         "",
-        "| Indicator | Fixed amount (atol) |",
-        "|---|---|",
+        "| Indicator | Fixed amount (atol) | Applies to |",
+        "|---|---|---|",
     ]
     for name in sorted(SPECTRUM_INDICATORS):
-        atol = SPECTRUM_INDICATORS[name]["tolerance"].atol
-        lines.append(f"| `{name}` | {_format_number(atol)} |")
+        spec = SPECTRUM_INDICATORS[name]
+        lines.append(f"| `{name}` | {_format_number(spec['tolerance'].atol)} | {_describe_scope(spec['scope'])} |")
     lines.append("")
     lines.append("</details>")
     return lines

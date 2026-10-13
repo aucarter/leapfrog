@@ -60,10 +60,27 @@ real coupling already implicit (and undocumented) in every existing
 `leapfrog_validate.indicators` extractor; it isn't new here, just made
 explicit because this is the first place two *different* sources' year axes
 ever need to line up cell-for-cell.
+
+Two further, year-only (no sex or age axis) Spectrum series back the
+tag-scoped `pmtct_need`/`cotrim_need` indicators (ticket 23):
+
+    AM_ChildNeedPMTCT_V1          -- pmtct_need, shape (year,). Read through the
+                                      avenir importer like the five above.
+    <ChildARTCalc MV2> (raw .DP)  -- cotrim_need. The avenir importer does NOT
+                                      fill `AM_ChildNeedCotrim_V1` from this
+                                      PJNZ block (that modvar stays all zero;
+                                      only a legacy `AM_ChildARTCalc_V1` tag
+                                      fills it), so `_read_raw_dp_cotrim_row`
+                                      reads the row straight out of the PJNZ's
+                                      `.DP` file instead -- the same stored
+                                      Spectrum value `pjnz::read_dp()` gave the
+                                      hardcoded `testthat` comparison it replaces.
 """
 
 from __future__ import annotations
 
+import io
+import zipfile
 from functools import lru_cache
 from pathlib import Path
 
@@ -240,3 +257,91 @@ def extract_spectrum_aids_deaths_on_treatment(pjnz: Path) -> np.ndarray:
     modvars = _import_modvars(pjnz)
     first_year, final_year = _year_window(modvars, pjnz)
     return _read_modvar(modvars, AM_AIDSDeathsARTSingleAgeTag, pjnz, first_year, final_year)
+
+
+def extract_spectrum_pmtct_need(pjnz: Path) -> np.ndarray:
+    """AM_ChildNeedPMTCT_V1 -> (year,), aligned to leapfrog's 1970-2030 window.
+
+    Year-only: no sex or age axis. The avenir importer fills this from the
+    DP's `<ChildNeedPMTCT MV>` row (`Tools.ImportPJNZ.DP.ImportDP.import_ChildNeedPMTCT`).
+    """
+    from SpectrumCommon.Const.AM.AMTags import AM_ChildNeedPMTCTTag  # noqa: PLC0415
+
+    modvars = _import_modvars(pjnz)
+    first_year, final_year = _year_window(modvars, pjnz)
+    try:
+        raw = np.asarray(modvars[AM_ChildNeedPMTCTTag], dtype=float)
+    except KeyError as e:
+        msg = f"{pjnz}: modvars missing tag {AM_ChildNeedPMTCTTag!r} ({e})"
+        raise SpectrumExtractError(msg) from e
+    return _align_to_leapfrog_years(raw, first_year, final_year, pjnz)
+
+
+_COTRIM_DP_TAG = "<ChildARTCalc MV2>"
+# Lines after the tag line: blank, `<Value>` header, then the both-sexes row
+# of "Children needing cotrimoxazole (0-14)" (male and female rows follow).
+_COTRIM_DP_ROW_OFFSET = 3
+_COTRIM_DP_ROW_LABEL = "Children needing cotrimoxazole"
+# Year values start at this comma-separated column (the importer's
+# `GB_RW_DataStartCol`), beginning at the projection's first year.
+_DP_DATA_START_COL = 3
+
+
+def _read_raw_dp_cotrim_row(pjnz: Path) -> np.ndarray:
+    """Read the both-sexes "Children needing cotrimoxazole (0-14)" row from `pjnz`'s raw `.DP`.
+
+    Returns every numeric cell on that row, starting at the projection's
+    first year; the caller trims it to the projection's own year count
+    (the row can carry padding past the final year). Raises
+    `SpectrumExtractError` (never a silent zero series) if the PJNZ has no
+    `.DP`, no `<ChildARTCalc MV2>` block, an unexpected row label, or a
+    non-numeric cell.
+    """
+    try:
+        with zipfile.ZipFile(pjnz) as z:
+            dp_name = next((n for n in z.namelist() if n.lower().endswith(".dp")), None)
+            if dp_name is None:
+                msg = f"{pjnz}: no .DP file inside the PJNZ"
+                raise SpectrumExtractError(msg)
+            with z.open(dp_name) as raw, io.TextIOWrapper(raw, encoding="latin-1") as lines:
+                for line in lines:
+                    if line.startswith(_COTRIM_DP_TAG):
+                        break
+                else:
+                    msg = f"{pjnz}: no {_COTRIM_DP_TAG} block in the .DP file"
+                    raise SpectrumExtractError(msg)
+                row_line = ""
+                for _ in range(_COTRIM_DP_ROW_OFFSET):
+                    row_line = next(lines, "")
+    except (OSError, zipfile.BadZipFile) as e:
+        msg = f"{pjnz}: could not read the .DP file ({e})"
+        raise SpectrumExtractError(msg) from e
+
+    fields = row_line.rstrip("\r\n").split(",")
+    if len(fields) < _DP_DATA_START_COL + 1 or not fields[1].startswith(_COTRIM_DP_ROW_LABEL):
+        msg = f"{pjnz}: expected a '{_COTRIM_DP_ROW_LABEL}' row in {_COTRIM_DP_TAG}"
+        raise SpectrumExtractError(msg)
+    cells = fields[_DP_DATA_START_COL:]
+    while cells and cells[-1].strip() == "":
+        cells.pop()
+    try:
+        return np.array([float(c) for c in cells])
+    except ValueError as e:
+        msg = f"{pjnz}: non-numeric cell in the {_COTRIM_DP_ROW_LABEL} row ({e})"
+        raise SpectrumExtractError(msg) from e
+
+
+def extract_spectrum_cotrim_need(pjnz: Path) -> np.ndarray:
+    """Children (0-14) needing cotrimoxazole, both sexes -> (year,), aligned to 1970-2030.
+
+    Read from the raw `.DP` (see this module's docstring): the avenir
+    importer leaves `AM_ChildNeedCotrim_V1` all zero for a PJNZ.
+    """
+    modvars = _import_modvars(pjnz)
+    first_year, final_year = _year_window(modvars, pjnz)
+    n_years = final_year - first_year + 1
+    row = _read_raw_dp_cotrim_row(pjnz)
+    if row.size < n_years:
+        msg = f"{pjnz}: cotrim need row has {row.size} values but the projection spans {n_years} years"
+        raise SpectrumExtractError(msg)
+    return _align_to_leapfrog_years(row[:n_years], first_year, final_year, pjnz)

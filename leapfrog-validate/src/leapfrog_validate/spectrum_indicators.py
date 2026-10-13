@@ -38,7 +38,7 @@ import numpy as np
 from leapfrog_validate import indicators, spectrum_extract
 from leapfrog_validate.diff import Tolerance, Verdict, diff_indicator
 from leapfrog_validate.exclusions import Exclusion, exclusion_mask
-from leapfrog_validate.indicators import ALL, Scope
+from leapfrog_validate.indicators import ALL, Scope, tag
 
 __all__ = [
     "ALL",
@@ -63,6 +63,13 @@ SPECTRUM_ATOL: dict[str, float] = {
     "treatment_population": 50.0,
     "aids_deaths_single_age": 1.0,
     "aids_deaths_on_treatment": 1.0,
+    # Ticket 23's tag-scoped, year-only indicators: counts of mothers/children,
+    # the same one-person scale as the deaths indicators. The `testthat`
+    # comparisons they replace used absolute-only thresholds (1e-3 and 0.5)
+    # sized for identical inputs; this track compares two different
+    # implementations, so it uses its uniform rtol plus this small atol.
+    "pmtct_need": 1.0,
+    "cotrim_need": 1.0,
 }
 
 
@@ -111,6 +118,24 @@ SPECTRUM_INDICATORS: dict[str, SpectrumIndicatorSpec] = {
         "tolerance": Tolerance(atol=SPECTRUM_ATOL["aids_deaths_on_treatment"], rtol=SPECTRUM_RTOL),
         "exclusions": (),
         "scope": ALL,
+    },
+    # Ticket 23: the two former hardcoded `test-child-model.R` comparisons, as
+    # ordinary tag-scoped entries. Tags come from `classify.domain_tags`
+    # (`has_pmtct`/`has_cotrim`: the PJNZ's PMTCT / cotrimoxazole input arrays
+    # are not all zero). Year-only arrays: no sex or age axis.
+    "pmtct_need": {
+        "extract_leapfrog": indicators.extract_pmtct_need,
+        "extract_spectrum": spectrum_extract.extract_spectrum_pmtct_need,
+        "tolerance": Tolerance(atol=SPECTRUM_ATOL["pmtct_need"], rtol=SPECTRUM_RTOL),
+        "exclusions": (),
+        "scope": tag("has_pmtct"),
+    },
+    "cotrim_need": {
+        "extract_leapfrog": indicators.extract_cotrim_need,
+        "extract_spectrum": spectrum_extract.extract_spectrum_cotrim_need,
+        "tolerance": Tolerance(atol=SPECTRUM_ATOL["cotrim_need"], rtol=SPECTRUM_RTOL),
+        "exclusions": (),
+        "scope": tag("has_cotrim"),
     },
 }
 

@@ -75,9 +75,9 @@ def _needs_tags() -> bool:
 
     Mirrors `cli.py`'s `compare_cmd` exactly: today's five blessed
     indicators are all `ALL`-scoped, so this is `False` and no `classify`
-    call (which shells out to Rscript) is ever paid for -- but a future
-    tag-scoped Spectrum-track indicator (ticket 23's territory) becomes
-    eligible for scope filtering with no further code change here.
+    call (which shells out to Rscript) is ever paid for. Since ticket 23,
+    `pmtct_need` (`has_pmtct`) and `cotrim_need` (`has_cotrim`) are
+    tag-scoped, so this is `True` and every PJNZ is classified once.
     """
     return any(spec["scope"].tags is not None for spec in SPECTRUM_INDICATORS.values())
 

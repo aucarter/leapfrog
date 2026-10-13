@@ -88,16 +88,28 @@ def test_failed_entry_shows_a_tick_or_cross_per_indicator():
 def test_lists_the_indicators_checked_with_their_tolerance():
     results = [PjnzResult(label="a.PJNZ", indicators=_passing("total_population"))]
     body = format_comment(results, ref_given="main", ref_sha="abc1234")
-    assert "Indicators checked (5)" in body
+    assert "Indicators checked (7)" in body
     assert "total_population" in body
     assert "hiv_population" in body
     assert "treatment_population" in body
     assert "aids_deaths_single_age" in body
     assert "aids_deaths_on_treatment" in body
+    assert "pmtct_need" in body
+    assert "cotrim_need" in body
     # Specific tolerance values, not just the word "tolerance".
     assert "50" in body
     assert "20" in body
     assert "1%" in body
+
+
+def test_the_indicator_table_says_which_files_each_indicator_applies_to():
+    """A file that lacks a tag silently skips that indicator, so the comment says so once, up front."""
+    results = [PjnzResult(label="a.PJNZ", indicators=_passing("total_population"))]
+    body = format_comment(results, ref_given="main", ref_sha="abc1234")
+    rows = {line.split("|")[1].strip(): line for line in body.splitlines() if line.startswith("| `")}
+    assert "All files" in rows["`total_population`"]
+    assert "`has_pmtct`" in rows["`pmtct_need`"]
+    assert "`has_cotrim`" in rows["`cotrim_need`"]
 
 
 def test_a_failed_file_is_named_with_its_pass_rate():
