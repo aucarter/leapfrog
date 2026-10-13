@@ -73,11 +73,11 @@ CACHE_DIR_HELP = "Where per-ref build workspaces (git worktrees, installed R lib
 def _needs_tags() -> bool:
     """Return whether any `SPECTRUM_INDICATORS` entry has a non-`ALL` `Scope`.
 
-    Mirrors `cli.py`'s `compare_cmd` exactly: today's five blessed
-    indicators are all `ALL`-scoped, so this is `False` and no `classify`
-    call (which shells out to Rscript) is ever paid for. Since ticket 23,
-    `pmtct_need` (`has_pmtct`) and `cotrim_need` (`has_cotrim`) are
-    tag-scoped, so this is `True` and every PJNZ is classified once.
+    Mirrors `cli.py`'s `compare_cmd`. The five blessed indicators are
+    `ALL`-scoped and would need no `classify` call (which shells out to
+    Rscript). Since ticket 23, `pmtct_need` (`has_pmtct`) and `cotrim_need`
+    (`has_cotrim`) are tag-scoped, so this is `True` and every PJNZ is
+    classified once.
     """
     return any(spec["scope"].tags is not None for spec in SPECTRUM_INDICATORS.values())
 

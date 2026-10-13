@@ -185,12 +185,16 @@ def _modvar_to_leapfrog_shape(arr_sex_age_year: np.ndarray) -> np.ndarray:
     return np.stack([male.T, female.T], axis=1)  # (year, sex=2, age)
 
 
-def _read_modvar(modvars: dict, tag: object, pjnz: Path, first_year: int, final_year: int) -> np.ndarray:
+def _require_modvar(modvars: dict, tag: object, pjnz: Path) -> np.ndarray:
     try:
-        raw = np.asarray(modvars[tag])
+        return np.asarray(modvars[tag])
     except KeyError as e:
         msg = f"{pjnz}: modvars missing tag {tag!r} ({e})"
         raise SpectrumExtractError(msg) from e
+
+
+def _read_modvar(modvars: dict, tag: object, pjnz: Path, first_year: int, final_year: int) -> np.ndarray:
+    raw = _require_modvar(modvars, tag, pjnz)
     aligned = _align_to_leapfrog_years(raw, first_year, final_year, pjnz)
     return _modvar_to_leapfrog_shape(aligned)
 
@@ -269,11 +273,7 @@ def extract_spectrum_pmtct_need(pjnz: Path) -> np.ndarray:
 
     modvars = _import_modvars(pjnz)
     first_year, final_year = _year_window(modvars, pjnz)
-    try:
-        raw = np.asarray(modvars[AM_ChildNeedPMTCTTag], dtype=float)
-    except KeyError as e:
-        msg = f"{pjnz}: modvars missing tag {AM_ChildNeedPMTCTTag!r} ({e})"
-        raise SpectrumExtractError(msg) from e
+    raw = _require_modvar(modvars, AM_ChildNeedPMTCTTag, pjnz)
     return _align_to_leapfrog_years(raw, first_year, final_year, pjnz)
 
 

@@ -1,7 +1,8 @@
 """Spectrum-comparison-track indicator registry: wires `diff_indicator` to Spectrum.
 
 A second, parallel registry to `leapfrog_validate.indicators.INDICATORS` --
-same five blessed indicators, same leapfrog-side extractors (imported, not
+the same five blessed indicators (plus, since ticket 23, the tag-scoped
+year-only `pmtct_need` and `cotrim_need`), same leapfrog-side extractors (imported, not
 redefined: this module is read-only with respect to `indicators.py`, which
 ticket 21 is working on in parallel on another branch), but each paired with
 a Spectrum-side extractor (`leapfrog_validate.spectrum_extract`) and this
