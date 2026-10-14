@@ -137,3 +137,28 @@ def test_compare_accepts_working_tree_sentinel_as_either_side(fake_build_and_run
 
     assert result.exit_code == 0, result.output
     assert seen_refs == [git_utils.WORKING_TREE, "main"]
+
+
+def test_compare_one_pjnz_matches_exclusions_on_the_full_corpus_label(monkeypatch, tmp_path):
+    """The exclusion identifier is the full label (`ETH/foo.PJNZ`), as in the Spectrum track.
+
+    It must not be the disk-safe form (`ETH__foo`) used for tmp-file names.
+    """
+    seen: list[str | None] = []
+
+    def fake_diff_one(name, a, b, pjnz):
+        del a, b
+        seen.append(pjnz)
+        return cli.Verdict(indicator=name, passed=True, max_abs_diff=0.0, n_cells=1, n_failed=0)
+
+    monkeypatch.setattr(cli.params, "build_params", lambda *_, **__: None)
+    monkeypatch.setattr(cli.model_run, "run_model", lambda *_, **__: None)
+    monkeypatch.setattr(cli, "_diff_one", fake_diff_one)
+
+    workspace = BuildWorkspace(worktree=Path("/fake"), r_library=Path("/fake/r-library"))
+    scoped = cli._ScopedPjnz(
+        path=tmp_path / "ETH" / "foo.PJNZ", label="ETH/foo.PJNZ", indicator_names=["total_population"]
+    )
+    cli._compare_one_pjnz(cli._RefPair(ref=workspace, candidate=workspace), scoped, "Spectrum", tmp_path)
+
+    assert seen == ["ETH/foo.PJNZ"]

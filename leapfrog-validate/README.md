@@ -87,14 +87,13 @@ not calendar years. Year 0 is 1970. Sex 0 is male and sex 1 is female. Age
 is single years, 0 to 80. A year-only indicator (`pmtct_need`) has no sex or
 age, so an entry with a `sex` or `age` bound is rejected for it.
 
-The `pjnz` text must match **exactly**. The two checks use different text:
-
-- **Spectrum check:** the corpus path with the extension, for example `ETH/example.PJNZ`.
-- **Regression check:** the corpus path without the extension, and with `/` changed to `__`, for example `ETH__example`. A file in the top folder is just `example`.
+The `pjnz` text must match **exactly**. Both checks use the corpus path
+with the extension, for example `ETH/example.PJNZ`. A file in the top folder
+is just `example.PJNZ`.
 
 A text that does not match is ignored with no error. So add a test that
 proves the exclusion applies. For the regression check, you can also run
-`leapfrog-validate diff a.h5 b.h5 --pjnz "ETH__example"` and look for
+`leapfrog-validate diff a.h5 b.h5 --pjnz "ETH/example.PJNZ"` and look for
 `N excluded` in the output.
 
 ### Tags and the manifest
