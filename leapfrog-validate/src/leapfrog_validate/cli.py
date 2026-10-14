@@ -217,11 +217,12 @@ def _compare_one_pjnz(
     `scoped.indicator_names` is the already scope-filtered subset of
     `indicators.INDICATORS` applicable to this PJNZ (`compare_cmd` computes
     it once via `classify.classify` before calling this helper).
-    `scoped.label` (see `_pjnz_label`) -- not `scoped.path.stem` -- seeds
-    the tmp-file basenames and the exclusion-matching identifier, so two
-    same-named files in different corpus subfolders don't collide on disk
-    or in exclusion lookups; it collapses to the old `pjnz.stem` exactly
-    for a flat corpus.
+    `scoped.label` (see `_pjnz_label`) -- not `scoped.path.stem` -- is the
+    exclusion-matching identifier, in full (for example `ETH/foo.PJNZ`). It
+    is the same text the Spectrum track matches on, and the text the
+    reproduce command's `--pjnz` takes. A disk-safe form of it (no
+    extension, `/` changed to `__`) seeds the tmp-file basenames, so two
+    same-named files in different corpus subfolders don't collide on disk.
     """
     safe_base = scoped.label.removesuffix(scoped.path.suffix).replace("/", "__")
     params_ref = tmp_dir / f"{safe_base}-ref-params.h5"
@@ -234,7 +235,7 @@ def _compare_one_pjnz(
     model_run.run_model(workspaces.ref, params_ref, output_ref, configuration)
     model_run.run_model(workspaces.candidate, params_candidate, output_candidate, configuration)
 
-    return [_diff_one(name, output_ref, output_candidate, safe_base) for name in sorted(scoped.indicator_names)]
+    return [_diff_one(name, output_ref, output_candidate, scoped.label) for name in sorted(scoped.indicator_names)]
 
 
 AZURE_CORPUS_PREFIX_DEFAULT = "2026 Estimates/Public Spectrum files"

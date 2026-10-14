@@ -1,16 +1,126 @@
 # leapfrog-validate
 
-Compare leapfrog model output across git refs, and (eventually) against
-Spectrum. See `.scratch/leapfrog-validation/PRD.md` for the full design;
-this package currently implements the walking skeleton
-(`.scratch/leapfrog-validation/issues/15-walking-skeleton-single-indicator-diff.md`),
-the full five-indicator registry and exclusion mechanism
-(`.scratch/leapfrog-validation/issues/17-full-indicator-registry-tolerance-rollup.md`),
-the `compare` directory wrapper plus working-tree support
-(`.scratch/leapfrog-validation/issues/19-compare-wrapper-working-tree.md`),
-and `compare`'s private Azure Blob corpus source plus tag-based indicator
-scoping
-(`.scratch/leapfrog-validation/issues/20-wire-corpus-into-compare-tag-scoping.md`).
+Check that leapfrog model output stays correct. The package compares
+leapfrog with an earlier leapfrog build, and with Spectrum's own values.
+See `.scratch/leapfrog-validation/PRD.md` for the full design. The sections
+below use "PJNZ file" for one input file and "indicator" for one output
+that the tool compares.
+
+## What it does
+
+| Feature | What you get |
+|---|---|
+| Regression check | Compares a PR with `main` on every PJNZ file in the corpus. Tight tolerance. Meant to block merges. |
+| Spectrum check | Compares leapfrog with the values stored in each PJNZ file. Looser tolerance. Never blocks a merge. |
+| PR comments | One comment for each check. Shows the pass rate, then collapsed lists of passed and failed files. Each failed file opens to its indicators and a reproduce command. Comments show counts and file names, never real numbers. |
+| Indicators | `total_population`, `hiv_population`, `treatment_population`, `aids_deaths_single_age`, `aids_deaths_on_treatment`. All by age and sex. The Spectrum check also has `pmtct_need` and `cotrim_need`. |
+| Tolerance | Each cell passes if `\|a - b\| <= atol + rtol * \|a\|`. One failed cell fails the indicator. |
+| Exclusions | Skip one known, explained difference for one PJNZ file. Needs a reason and a link. |
+| Tags | Tags found from the PJNZ file (`goals`, `aim_only`, `has_pmtct`, `has_cotrim`). A tag can limit an indicator to some files. |
+| Refs | Any git branch or SHA, or `working-tree` for your uncommitted changes. Builds are cached. |
+| Private corpus | PJNZ files in Azure Blob storage. CI logs in with GitHub OIDC. No PJNZ data is in this repo. |
+| Local commands | `build-params`, `run`, `diff`, `compare` and `classify`. See "Usage". |
+
+Only `leapfrogr` runs the model here. `build-params` calls
+`leapfrog::process_pjnz()`. `run` calls `leapfrog::run_model()`. The R scripts
+are in `src/leapfrog_validate/r_scripts/`. Everything else is Python.
+
+A separate check, `.github/workflows/model-output-equality.yaml`, compares
+the R, Python and C++ interfaces with exact `h5diff`. It covers the
+`leapfrog-py` and C++ adapters. Keep it.
+
+## How to change things
+
+All paths are under `src/leapfrog_validate/`.
+
+| I want to... | Edit this |
+|---|---|
+| Add an indicator to the regression check | `INDICATORS` in `indicators.py` |
+| Add an indicator to the Spectrum check | `SPECTRUM_INDICATORS` in `spectrum_indicators.py` |
+| Change a tolerance | `Tolerance(...)` in the indicator entry. Regression: `RTOL` in `indicators.py`. Spectrum: `SPECTRUM_RTOL` and `SPECTRUM_ATOL` in `spectrum_indicators.py`. |
+| Exclude a known difference | `exclusions` tuple in the indicator entry |
+| Limit an indicator to some files | `scope` in the indicator entry |
+| Add a tag found from the file | `classify.py` and `r_scripts/classify_pjnz.R` |
+| Add a tag by hand | A manifest file (see "Manifest") |
+| Change how Spectrum values are read | `spectrum_extract.py` |
+| Change the PR comment text or layout | `report_regression.py`, `report_spectrum.py`, `comment_format.py` |
+| Change when CI runs | `.github/workflows/regression-track.yml`, `spectrum-track.yml` |
+| Add a PJNZ file to the corpus | Upload it to the Azure container. See `infra/README.md`. No code change. |
+| Change which files the R, Python and C++ check uses | `select_fixtures.py` and `model-output-equality.yaml` |
+
+The regression check and the Spectrum check have **separate** registries.
+An indicator in one is not in the other.
+
+### Add an indicator
+
+1. Write an `extract_...` function in `indicators.py`. It takes the path of
+   an `output.h5` file and returns a NumPy array.
+2. For the Spectrum check, also write an `extract_spectrum_...` function in
+   `spectrum_extract.py`. It returns an array of the same shape and
+   covers the same years.
+3. Add an entry to the registry (or both registries). Set `tolerance`,
+   `exclusions` (use `()` if none) and `scope` (use `ALL` for every file).
+4. Add a test in `tests/`.
+
+The `diff` command, the CI jobs and the PR comments read the registry. You
+do not need to change any other list. `pmtct_need` in
+`spectrum_indicators.py` is a small working example.
+
+### Add an exclusion
+
+Add an `Exclusion` to the `exclusions` tuple of the indicator:
+
+```python
+Exclusion(
+    pjnz="ETH/example.PJNZ",
+    reason="Short reason",
+    link="https://github.com/hivtools/leapfrog/issues/123",
+    year=(40, 50),  # optional. Index range, both ends included.
+    sex=None,       # optional. None means every index.
+    age=(0, 14),    # optional.
+)
+```
+
+`reason` and `link` are required. Leave out `year`, `sex` and `age` to
+exclude the whole indicator for that file. The bounds are index positions,
+not calendar years. Year 0 is 1970. Sex 0 is male and sex 1 is female. Age
+is single years, 0 to 80. A year-only indicator (`pmtct_need`) has no sex or
+age, so an entry with a `sex` or `age` bound is rejected for it.
+
+The `pjnz` text must match **exactly**. Both checks use the corpus path
+with the extension, for example `ETH/example.PJNZ`. A file in the top folder
+is just `example.PJNZ`.
+
+A text that does not match is ignored with no error. So add a test that
+proves the exclusion applies. For the regression check, you can also run
+`leapfrog-validate diff a.h5 b.h5 --pjnz "ETH/example.PJNZ"` and look for
+`N excluded` in the output.
+
+### Tags and the manifest
+
+Tags come from three places:
+
+- `goals` or `aim_only`: from the zip contents (a `.HV` member means `goals`).
+- `has_pmtct` and `has_cotrim`: from the input data. The tag is true when the PMTCT or cotrimoxazole input array is not all zero.
+- The manifest: tags you set by hand.
+
+To see the tags of one file, run `uv run leapfrog-validate classify <ref> <file.PJNZ>`.
+
+To limit an indicator to some files, set `scope=tag("has_pmtct")`. A file
+must have every listed tag. A file without the tag is skipped with no error.
+
+**Manifest.** This is a JSON file, for example
+`{"ETH/example.PJNZ": ["custom_made"]}`. Pass it with `--manifest` to
+`compare` or `classify`. No manifest file exists in the repo today. **The CI
+jobs do not read a manifest.** To use manifest tags in CI, add a file to the
+repo and change the workflows and the CI scripts.
+
+### Run the tests
+
+```sh
+uv run pytest                       # whole suite. About 6 minutes. Builds leapfrogr.
+uv run pytest tests/test_report_spectrum.py   # one file. Seconds.
+```
 
 ## Usage
 
