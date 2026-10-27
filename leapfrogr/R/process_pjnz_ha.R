@@ -40,6 +40,18 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   }
   incidinput <- incidinput / 100
 
+  ## Spectrum multiplies the incidence input by <IncidenceAdjustmentFactor MV>
+  ## each year (read by pjnz >= the release adding incidence_adjustment_factor;
+  ## NULL with older pjnz or files without the tag).
+  iaf <- pars$incidence_adjustment_factor
+  if (!is.null(iaf)) {
+    if (length(iaf) != length(incidinput)) {
+      stop("incidence_adjustment_factor has ", length(iaf),
+           " years but the incidence input has ", length(incidinput))
+    }
+    incidinput <- incidinput * iaf
+  }
+
   hiv_steps_per_year <- 10
 
   incidence_model_choice <- 0L

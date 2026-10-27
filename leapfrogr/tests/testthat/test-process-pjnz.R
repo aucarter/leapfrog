@@ -160,4 +160,19 @@ test_that("projection period follows the Spectrum version the file was saved wit
   expect_equal(spectrum_projection_period("6.13"), "midyear")
   expect_equal(spectrum_projection_period("5.1"), "midyear")
   expect_error(spectrum_projection_period("unknown"), "Could not read")
+test_that("incidence input carries Spectrum's incidence adjustment factor", {
+  pjnz <- system.file("pjnz", "Botswana2018.PJNZ", package = "pjnz")
+  skip_if(!nzchar(pjnz), "pjnz test file not available")
+  dat <- pjnz::read_dp(pjnz)
+  iaf <- dat$data$incidence_adjustment_factor$data
+  skip_if(is.null(iaf), "installed pjnz does not read incidence_adjustment_factor")
+  pars <- lapply(dat$data, `[[`, "data")
+  raw <- (if (!is.null(pars$incidence_by_fit) && !is.null(pars$incidence_options)) {
+    pars$incidence_by_fit[pars$incidence_options + 1, ]
+  } else {
+    pars$incidence_input
+  }) / 100
+  p <- process_pjnz(pjnz)
+  expect_equal(p$incidinput, raw * iaf, ignore_attr = TRUE)
+  expect_false(isTRUE(all.equal(p$incidinput, raw, check.attributes = FALSE)))
 })
