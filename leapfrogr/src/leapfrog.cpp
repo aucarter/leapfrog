@@ -21,7 +21,9 @@ std::vector<std::string> list_model_configurations() {
     "HivCoarseAgeStratificationEntrants",
     "ChildModel",
     "CoarseChildModel",
+    "CoarseChildModelPopAdjust",
     "Spectrum",
+    "SpectrumPopAdjust",
     "GBD",
     "GBDvirgin"
   };
@@ -149,8 +151,12 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::ChildModel>(std::forward<Args>(args)...);
   } else if (configuration == "CoarseChildModel") {
     return simulate_model<leapfrog::CoarseChildModel>(std::forward<Args>(args)...);
+  } else if (configuration == "CoarseChildModelPopAdjust") {
+    return simulate_model<leapfrog::CoarseChildModelPopAdjust>(std::forward<Args>(args)...);
   } else if (configuration == "Spectrum") {
     return simulate_model<leapfrog::Spectrum>(std::forward<Args>(args)...);
+  } else if (configuration == "SpectrumPopAdjust") {
+    return simulate_model<leapfrog::SpectrumPopAdjust>(std::forward<Args>(args)...);
   } else if (configuration == "GBD") {
     return simulate_model<leapfrog::GBD>(std::forward<Args>(args)...);
   } else if (configuration == "GBDvirgin") {
@@ -229,8 +235,12 @@ Rcpp::List get_leapfrog_ss(
     return leapfrog::get_ss_r<leapfrog::ChildModel>();
   } else if (configuration == "CoarseChildModel") {
     return leapfrog::get_ss_r<leapfrog::CoarseChildModel>();
+  } else if (configuration == "CoarseChildModelPopAdjust") {
+    return leapfrog::get_ss_r<leapfrog::CoarseChildModelPopAdjust>();
   } else if (configuration == "Spectrum") {
     return leapfrog::get_ss_r<leapfrog::Spectrum>();
+  } else if (configuration == "SpectrumPopAdjust") {
+    return leapfrog::get_ss_r<leapfrog::SpectrumPopAdjust>();
   } else if (configuration == "GBD") {
     return leapfrog::get_ss_r<leapfrog::GBD>();
   } else if (configuration == "GBDvirgin") {

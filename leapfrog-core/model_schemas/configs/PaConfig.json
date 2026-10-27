@@ -1,0 +1,29 @@
+{
+  "name": "Pa",
+  "long_name": "PopulationAdjustment",
+  "namespace": "pa",
+  "enable_if": "run_population_adjustment",
+  "state_space": {
+    "default": {}
+  },
+  "pars": {
+    "population_adjustment_target": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "targetpop"
+      }
+    },
+    "population_adjustment_final_step": {
+      "num_type": "int"
+    }
+  },
+  "intermediate": {
+    "population_adjustment_ratio": {
+      "num_type": "real_type",
+      "dims": ["SS::pAG", "SS::NS"]
+    }
+  },
+  "state": {
+  }
+}

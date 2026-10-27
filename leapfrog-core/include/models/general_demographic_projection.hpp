@@ -78,6 +78,27 @@ struct GeneralDemographicProjection<Config> {
     }
   };
 
+  void run_population_adjustment() {
+    static_assert(ModelVariant::run_population_adjustment,
+                  "run_population_adjustment can only be called for model variants where run_population_adjustment is true");
+    const auto& p_pa = pars.pa;
+    auto& i_pa = intermediate.pa;
+    auto& n_dp = state_next.dp;
+
+    // Spectrum's regional population adjustment: at the end of each projection
+    // year up to the final step (Spectrum's CustomPopStopRescalingYear) the
+    // population is set to an external target by single age and sex. The ratio
+    // is kept so the HIV population can be scaled with it.
+    const bool adjust = t <= p_pa.population_adjustment_final_step;
+    for (int s = 0; s < NS; ++s) {
+      for (int a = 0; a < pAG; ++a) {
+        i_pa.population_adjustment_ratio(a, s) = !adjust || n_dp.p_totpop(a, s) == 0.0 ? 1.0 :
+          p_pa.population_adjustment_target(a, s, t) / n_dp.p_totpop(a, s);
+        n_dp.p_totpop(a, s) *= i_pa.population_adjustment_ratio(a, s);
+      }
+    }
+  };
+
   // private methods that we don't want people to call
   private:
   void run_ageing_and_mortality() {

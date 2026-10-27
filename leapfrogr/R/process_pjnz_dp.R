@@ -57,15 +57,30 @@ process_pjnz_dp <- function(dat, pars, dim_vars) {
     netmigr
   }
 
-  list(
-    projection_start_year = pars$first_year,
-    projection_period = projection_period,
-    basepop = basepop,
-    Sx = sx,
-    netmigr_adj = netmigr_adj,
-    asfr = asfr,
-    births_sex_prop = births_sex_prop,
-    tfr = pars$tfr
+  ## Spectrum's regional population adjustment (RegionalAdjustPopCBState = 1):
+  ## the population is rescaled to this series at the end of each projection
+  ## year up to CustomPopStopRescalingYear. Simulate with a *PopAdjust model
+  ## configuration when these are present.
+  population_adjustment <- if (isTRUE(pars$regional_adjust_pop_state == 1)) {
+    list(
+      targetpop = pars$regional_adjust_pop,
+      population_adjustment_final_step =
+        as.integer(pars$custom_pop_stop_rescaling_year - pars$first_year)
+    )
+  }
+
+  c(
+    list(
+      projection_start_year = pars$first_year,
+      projection_period = projection_period,
+      basepop = basepop,
+      Sx = sx,
+      netmigr_adj = netmigr_adj,
+      asfr = asfr,
+      births_sex_prop = births_sex_prop,
+      tfr = pars$tfr
+    ),
+    population_adjustment
   )
 }
 

@@ -962,6 +962,40 @@ end;
 
 {$ALIGN 8}
 type
+  LeapfrogPopulationAdjustmentParamsView = record
+  private
+    populationAdjustmentTarget: PDouble;
+    populationAdjustmentTargetLength: Integer;
+    populationAdjustmentFinalStep: Integer;
+    populationAdjustmentFinalStepLength: Integer;
+end;
+
+type
+  LeapfrogPopulationAdjustmentParams = class
+  public
+    populationAdjustmentTarget: TGBFixedArray<Double>;
+    populationAdjustmentFinalStep: Integer;
+    function getView(): LeapfrogPopulationAdjustmentParamsView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
+  LeapfrogPopulationAdjustmentStateView = record
+  private
+end;
+
+type
+  LeapfrogPopulationAdjustmentState = class
+  public
+    function getView(): LeapfrogPopulationAdjustmentStateView;
+    procedure writeToDisk(dir: string);
+    Destructor Destroy; override;
+end;
+
+{$ALIGN 8}
+type
   LeapfrogParams = record
   private
     demproj: ^LeapfrogDemProjParamsView;
@@ -971,6 +1005,7 @@ type
     goals: ^LeapfrogGoalsParamsView;
     virgin: ^LeapfrogVirginParamsView;
     entrants: ^LeapfrogEntrantsParamsView;
+    populationadjustment: ^LeapfrogPopulationAdjustmentParamsView;
   public
     procedure SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
     procedure SetHivAdultParams(const hivadultParams: LeapfrogHivAdultParamsView);
@@ -979,6 +1014,7 @@ type
     procedure SetGoalsParams(const goalsParams: LeapfrogGoalsParamsView);
     procedure SetVirginParams(const virginParams: LeapfrogVirginParamsView);
     procedure SetEntrantsParams(const entrantsParams: LeapfrogEntrantsParamsView);
+    procedure SetPopulationAdjustmentParams(const populationadjustmentParams: LeapfrogPopulationAdjustmentParamsView);
 end;
 
 {$ALIGN 8}
@@ -992,6 +1028,7 @@ type
     goals: ^LeapfrogGoalsStateView;
     virgin: ^LeapfrogVirginStateView;
     entrants: ^LeapfrogEntrantsStateView;
+    populationadjustment: ^LeapfrogPopulationAdjustmentStateView;
   public
     procedure SetDemProjState(const demprojState: LeapfrogDemProjStateView);
     procedure SetHivAdultState(const hivadultState: LeapfrogHivAdultStateView);
@@ -1000,6 +1037,7 @@ type
     procedure SetGoalsState(const goalsState: LeapfrogGoalsStateView);
     procedure SetVirginState(const virginState: LeapfrogVirginStateView);
     procedure SetEntrantsState(const entrantsState: LeapfrogEntrantsStateView);
+    procedure SetPopulationAdjustmentState(const populationadjustmentState: LeapfrogPopulationAdjustmentStateView);
 end;
 
 type TCallbackFunction = procedure(Msg: PAnsiChar); stdcall;
@@ -1833,6 +1871,29 @@ function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;
 begin;
 end;
 
+destructor LeapfrogPopulationAdjustmentParams.Destroy;
+begin;
+  populationAdjustmentTarget.Free;
+  inherited;
+end;
+
+destructor LeapfrogPopulationAdjustmentState.Destroy;
+begin;
+  inherited;
+end;
+
+function LeapfrogPopulationAdjustmentParams.getView(): LeapfrogPopulationAdjustmentParamsView;
+begin;
+  Result.populationAdjustmentTarget := PDouble(populationAdjustmentTarget.data);
+  Result.populationAdjustmentTargetLength := populationAdjustmentTarget.GetLength();
+  Result.populationAdjustmentFinalStep := populationAdjustmentFinalStep;
+  Result.populationAdjustmentFinalStepLength := 1;
+end;
+
+function LeapfrogPopulationAdjustmentState.getView(): LeapfrogPopulationAdjustmentStateView;
+begin;
+end;
+
 procedure LeapfrogDemProjParams.writeToDisk(dir: string);
 begin;
   if not DirectoryExists(dir) then
@@ -2101,6 +2162,19 @@ begin;
     ForceDirectories(dir);
 end;
 
+procedure LeapfrogPopulationAdjustmentParams.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+  populationAdjustmentTarget.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'populationAdjustmentTarget');
+end;
+
+procedure LeapfrogPopulationAdjustmentState.writeToDisk(dir: string);
+begin;
+  if not DirectoryExists(dir) then
+    ForceDirectories(dir);
+end;
+
 procedure LeapfrogParams.SetDemProjParams(const demprojParams: LeapfrogDemProjParamsView);
 begin
   demproj := @demprojParams;
@@ -2169,6 +2243,16 @@ end;
 procedure LeapfrogState.SetEntrantsState(const entrantsState: LeapfrogEntrantsStateView);
 begin
   entrants := @entrantsState;
+end;
+
+procedure LeapfrogParams.SetPopulationAdjustmentParams(const populationadjustmentParams: LeapfrogPopulationAdjustmentParamsView);
+begin
+  populationadjustment := @populationadjustmentParams;
+end;
+
+procedure LeapfrogState.SetPopulationAdjustmentState(const populationadjustmentState: LeapfrogPopulationAdjustmentStateView);
+begin
+  populationadjustment := @populationadjustmentState;
 end;
 
 end.

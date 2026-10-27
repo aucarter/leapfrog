@@ -113,6 +113,90 @@ struct HivDemographicProjection<Config> {
     }
   };
 
+  void run_hivpop_population_adjustment() {
+    static_assert(ModelVariant::run_population_adjustment,
+                  "run_hivpop_population_adjustment can only be called for model variants where run_population_adjustment is true");
+    static_assert(!ModelVariant::run_virgin,
+                  "population adjustment does not yet scale the virgin population");
+    auto& n_ha = state_next.ha;
+    const auto& i_pa = intermediate.pa;
+
+    // Adult stratified population: scale each HIV age group by the change in
+    // its single-age HIV population, as for migration
+    for (int s = 0; s < NS; ++s) {
+      int a = p_idx_hiv_first_adult;
+      for (int ha = 0; ha < hAG; ++ha) {
+        real_type hivpop_ha = 0.0;
+        real_type hivpop_ha_adj = 0.0;
+        for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
+          hivpop_ha += n_ha.p_hivpop(a, s);
+          hivpop_ha_adj += n_ha.p_hivpop(a, s) * i_pa.population_adjustment_ratio(a, s);
+        }
+
+        real_type adjustment_ratio = hivpop_ha > 0.0 ? hivpop_ha_adj / hivpop_ha : 1.0;
+        for (int hm = 0; hm < hDS; ++hm) {
+          n_ha.h_hivpop(hm, ha, s) *= adjustment_ratio;
+          if (t >= opts.ts_art_start) {
+            for (int hu = 0; hu < hTS; ++hu) {
+              n_ha.h_artpop(hu, hm, ha, s) *= adjustment_ratio;
+            }
+          }
+        }
+      }
+    }
+
+    for (int s = 0; s < NS; ++s) {
+      for (int a = 0; a < pAG; ++a) {
+        n_ha.p_hivpop(a, s) *= i_pa.population_adjustment_ratio(a, s);
+      }
+    }
+  };
+
+  void run_hc_hivpop_population_adjustment() {
+    static_assert(ModelVariant::run_child_model && ModelVariant::run_population_adjustment,
+                  "run_hc_hivpop_population_adjustment can only be called for model variants where run_child_model and run_population_adjustment are true");
+    static constexpr int hc2_agestart = SS::hc2_agestart;
+    static constexpr int hcAG_end = SS::hcAG_end;
+    static constexpr int hc1DS = SS::hc1DS;
+    static constexpr int hc2DS = SS::hc2DS;
+    static constexpr int hcTT = SS::hcTT;
+
+    auto& n_hc = state_next.hc;
+    const auto& p_hc = pars.hc;
+    const auto& i_pa = intermediate.pa;
+
+    for (int s = 0; s < NS; ++s) {
+      for (int a = 0; a < hcAG_end; ++a) {
+        real_type adjustment_ratio = i_pa.population_adjustment_ratio(a, s);
+        if (a < hc2_agestart) {
+          for (int cat = 0; cat < hcTT; ++cat) {
+            for (int hd = 0; hd < hc1DS; ++hd) {
+              n_hc.hc1_hivpop(hd, cat, a, s) *= adjustment_ratio;
+            }
+          }
+          if (t >= p_hc.hc_art_start) {
+            for (int hd = 0; hd < hc1DS; ++hd) {
+              for (int dur = 0; dur < hTS; ++dur) {
+                n_hc.hc1_artpop(dur, hd, a, s) *= adjustment_ratio;
+              }
+            }
+          }
+        } else {
+          for (int hd = 0; hd < hc2DS; ++hd) {
+            for (int cat = 0; cat < hcTT; ++cat) {
+              n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) *= adjustment_ratio;
+            }
+            if (t >= p_hc.hc_art_start) {
+              for (int dur = 0; dur < hTS; ++dur) {
+                n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s) *= adjustment_ratio;
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
   void run_hc_hivpop_end_year_migration() {
     static_assert(ModelVariant::run_child_model,
                   "run_hc_hivpop_end_year_migration can only be called for model variants where run_child_model is true");
