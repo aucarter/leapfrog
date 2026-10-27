@@ -151,3 +151,20 @@ test_that("process_pjnz converts non-age stratified nosocomial infections to age
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[1, ] == 1))
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[2:15, ] == 0))
 })
+
+test_that("incidence input carries Spectrum's incidence adjustment factor", {
+  pjnz <- system.file("pjnz", "Botswana2018.PJNZ", package = "pjnz")
+  skip_if(!nzchar(pjnz), "pjnz test file not available")
+  dat <- pjnz::read_dp(pjnz)
+  iaf <- dat$data$incidence_adjustment_factor$data
+  skip_if(is.null(iaf), "installed pjnz does not read incidence_adjustment_factor")
+  pars <- lapply(dat$data, `[[`, "data")
+  raw <- (if (!is.null(pars$incidence_by_fit) && !is.null(pars$incidence_options)) {
+    pars$incidence_by_fit[pars$incidence_options + 1, ]
+  } else {
+    pars$incidence_input
+  }) / 100
+  p <- process_pjnz(pjnz)
+  expect_equal(p$incidinput, raw * iaf, ignore_attr = TRUE)
+  expect_false(isTRUE(all.equal(p$incidinput, raw, check.attributes = FALSE)))
+})
