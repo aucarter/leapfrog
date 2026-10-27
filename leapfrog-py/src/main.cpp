@@ -4,7 +4,9 @@ std::vector<std::string> list_model_configurations() {
   return std::vector<std::string>{
     "DemographicProjection",
     "HivFullAgeStratification",
+    "HivFullAgeStratificationEntrants",
     "HivCoarseAgeStratification",
+    "HivCoarseAgeStratificationEntrants",
     "ChildModel",
     "Spectrum"
   };
@@ -16,8 +18,12 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::DemographicProjection>(std::forward<Args>(args)...);
   } else if (configuration == "HivFullAgeStratification") {
     return simulate_model<leapfrog::HivFullAgeStratification>(std::forward<Args>(args)...);
+  } else if (configuration == "HivFullAgeStratificationEntrants") {
+    return simulate_model<leapfrog::HivFullAgeStratificationEntrants>(std::forward<Args>(args)...);
   } else if (configuration == "HivCoarseAgeStratification") {
     return simulate_model<leapfrog::HivCoarseAgeStratification>(std::forward<Args>(args)...);
+  } else if (configuration == "HivCoarseAgeStratificationEntrants") {
+    return simulate_model<leapfrog::HivCoarseAgeStratificationEntrants>(std::forward<Args>(args)...);
   } else if (configuration == "ChildModel") {
     return simulate_model<leapfrog::ChildModel>(std::forward<Args>(args)...);
   } else if (configuration == "Spectrum") {
@@ -73,8 +79,12 @@ nb::dict get_leapfrog_ss(const std::string configuration) {
     return leapfrog::get_ss_py<leapfrog::DemographicProjection>();
   } else if (configuration == "HivFullAgeStratification") {
     return leapfrog::get_ss_py<leapfrog::HivFullAgeStratification>();
+  } else if (configuration == "HivFullAgeStratificationEntrants") {
+    return leapfrog::get_ss_py<leapfrog::HivFullAgeStratificationEntrants>();
   } else if (configuration == "HivCoarseAgeStratification") {
     return leapfrog::get_ss_py<leapfrog::HivCoarseAgeStratification>();
+  } else if (configuration == "HivCoarseAgeStratificationEntrants") {
+    return leapfrog::get_ss_py<leapfrog::HivCoarseAgeStratificationEntrants>();
   } else if (configuration == "ChildModel") {
     return leapfrog::get_ss_py<leapfrog::ChildModel>();
   } else if (configuration == "Spectrum") {

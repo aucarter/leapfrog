@@ -8,7 +8,8 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   },
   "HivFullAgeStratification": {
     "run_demographic_projection": "true",
@@ -17,9 +18,22 @@
     "run_child_model": "false",
     "age10_adult": "false",
     "age105_open": "false",
-    "run_virgin": "false",    
+    "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
+  },
+  "HivFullAgeStratificationEntrants": {
+    "run_demographic_projection": "true",
+    "run_hiv_simulation": "true",
+    "use_coarse_stratification": "false",
+    "run_child_model": "false",
+    "age10_adult": "false",
+    "age105_open": "false",
+    "run_virgin": "false",
+    "run_spectrum_model": "false",
+    "run_goals": "false",
+    "run_static_entrants": "true"
   },
   "HivCoarseAgeStratification": {
     "run_demographic_projection": "true",
@@ -30,7 +44,20 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
+  },
+  "HivCoarseAgeStratificationEntrants": {
+    "run_demographic_projection": "true",
+    "run_hiv_simulation": "true",
+    "use_coarse_stratification": "true",
+    "run_child_model": "false",
+    "age10_adult": "false",
+    "age105_open": "false",
+    "run_virgin": "false",
+    "run_spectrum_model": "false",
+    "run_goals": "false",
+    "run_static_entrants": "true"
   },
   "ChildModel": {
     "run_demographic_projection": "true",
@@ -41,7 +68,8 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   },
   "CoarseChildModel": {
     "run_demographic_projection": "true",
@@ -52,7 +80,8 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   },
   "Spectrum": {
     "run_demographic_projection": "true",
@@ -63,7 +92,8 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "true",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   },
   "Goals": {
     "run_demographic_projection": "true",
@@ -74,7 +104,8 @@
     "age105_open": "false",
     "run_virgin": "false",
     "run_spectrum_model": "true",
-    "run_goals": "true"
+    "run_goals": "true",
+    "run_static_entrants": "false"
   },
   "GBD": {
     "run_demographic_projection": "true",
@@ -85,7 +116,8 @@
     "age105_open": "true",
     "run_virgin": "false",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   },
   "GBDvirgin": {
     "run_demographic_projection": "true",
@@ -96,6 +128,7 @@
     "age105_open": "true",
     "run_virgin": "true",
     "run_spectrum_model": "false",
-    "run_goals": "false"
+    "run_goals": "false",
+    "run_static_entrants": "false"
   }
 }
