@@ -151,3 +151,10 @@ test_that("process_pjnz converts non-age stratified nosocomial infections to age
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[1, ] == 1))
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[2:15, ] == 0))
 })
+
+test_that("relative infectiousness on ART is read from the DP", {
+  pjnz <- system.file("pjnz/bwa_aim-adult-art-no-special-elig_v6.13_2022-04-18.PJNZ", package = "leapfrog")
+  dat <- pjnz::read_dp(pjnz)
+  p <- process_pjnz(pjnz)
+  expect_equal(p$relative_infectiousness_art, 1 - dat$data$adult_infect_reduc$data)
+})
