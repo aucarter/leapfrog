@@ -57,7 +57,14 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   incidence_model_choice <- 0L
   transmission_rate_hts <- numeric(length(incidinput) * hiv_steps_per_year)
   initial_incidence <- 0.0
-  relative_infectiousness_art <- 0.1
+  ## Spectrum: transmission on ART is reduced by <AdultInfectReduc MV>
+  ## (e.g. 0.89199 in ZWE 2026, 0.885 in MWI 2026). Fall back to 0.1 when a
+  ## file does not carry it.
+  relative_infectiousness_art <- if (!is.null(pars$adult_infect_reduc)) {
+    1 - pars$adult_infect_reduc
+  } else {
+    0.1
+  }
   epidemic_start_hts <- length(transmission_rate_hts)
 
   incrr_age <- pars$dist_of_hiv
