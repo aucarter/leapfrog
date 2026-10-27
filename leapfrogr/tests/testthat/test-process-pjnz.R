@@ -151,3 +151,13 @@ test_that("process_pjnz converts non-age stratified nosocomial infections to age
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[1, ] == 1))
   expect_true(all(pars_child$hc_nosocomial_infections_by_age[2:15, ] == 0))
 })
+
+test_that("projection period follows the Spectrum version the file was saved with", {
+  expect_equal(spectrum_projection_period("6.43"), "calendar")
+  expect_equal(spectrum_projection_period("6,43"), "calendar")
+  expect_equal(spectrum_projection_period("6.2"), "calendar")
+  expect_equal(spectrum_projection_period("6.38 Beta 18"), "calendar")
+  expect_equal(spectrum_projection_period("6.13"), "midyear")
+  expect_equal(spectrum_projection_period("5.1"), "midyear")
+  expect_error(spectrum_projection_period("unknown"), "Could not read")
+})

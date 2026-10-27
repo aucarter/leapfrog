@@ -43,10 +43,10 @@ process_pjnz_dp <- function(dat, pars, dim_vars) {
   netmigr[1:5, 1, ] <- u5prop[, 1, drop = FALSE] %*% netmigr_5year[1, 1, ]
   netmigr[1:5, 2, ] <- u5prop[, 2, drop = FALSE] %*% netmigr_5year[1, 2, ]
 
-  ## valid_vers records the version number that PJNZ was saved with
-  pars$projection_period <- if (pars$valid_vers > "6.2") "calendar" else "midyear"
-
-  projection_period <- if (pars$version_num > "6.2") "calendar" else "midyear"
+  ## Spectrum >= 6.2 projects calendar years. valid_vers is the Spectrum
+  ## version the PJNZ was saved with; version_num (<VersionNum MV2>, e.g. 5.1)
+  ## is not, and using it treated every current file as mid-year.
+  projection_period <- spectrum_projection_period(pars$valid_vers)
   netmigr_adj <- if (projection_period == "midyear") {
     adj <- netmigr
     adj[-1, , ] <- (netmigr[-1, , ] + netmigr[-81, , ]) / 2
@@ -67,4 +67,24 @@ process_pjnz_dp <- function(dat, pars, dim_vars) {
     births_sex_prop = births_sex_prop,
     tfr = pars$tfr
   )
+}
+
+
+#' Projection period implied by the Spectrum version a PJNZ was saved with
+#'
+#' Spectrum 6.2 and later project calendar years; earlier versions project
+#' mid-year to mid-year. Versions compare as decimals (6.13 < 6.2 < 6.43).
+#'
+#' @param valid_vers `<ValidVers MV>` from the DP, e.g. "6.43", "6,43" or
+#'   "6.38 Beta 18"
+#' @return "calendar" or "midyear"
+#' @keywords internal
+spectrum_projection_period <- function(valid_vers) {
+  v <- sub("^([0-9]+),", "\\1.", trimws(as.character(valid_vers)))
+  v <- regmatches(v, regexpr("^[0-9]+(\\.[0-9]+)?", v))
+  if (length(v) != 1L) {
+    stop("Could not read Spectrum version from ValidVers: '", valid_vers, "'")
+  }
+  ## Spectrum versions are decimals: 6.13 (2022) precedes 6.2, 6.43 follows it
+  if (as.numeric(v) >= 6.2) "calendar" else "midyear"
 }
