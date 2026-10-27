@@ -944,10 +944,15 @@ struct ChildModelSimulation<Config> {
     auto& n_hc = state_next.hc;
     auto& i_hc = intermediate.hc;
 
+    // Coverage is capped at 100%, as PMTCT is capped at need above. Without
+    // the cap, a cotrimoxazole count above need makes cotrim_mean negative:
+    // child HIV deaths turn into additions to the HIV+ population.
     if (p_hc.cotrim_val_is_percent(t)) {
-      i_hc.cotrim_mean(art_flag) = 1 - p_hc.cotrim_effect(art_flag) * p_hc.cotrim_val(t);
+      const real_type coverage = std::min(p_hc.cotrim_val(t), 1.0);
+      i_hc.cotrim_mean(art_flag) = 1 - p_hc.cotrim_effect(art_flag) * coverage;
     } else if (n_hc.cotrim_need > 0) {
-      i_hc.cotrim_mean(art_flag) = 1 - p_hc.cotrim_effect(art_flag) * p_hc.cotrim_val(t) / n_hc.cotrim_need;
+      const real_type coverage = std::min(p_hc.cotrim_val(t) / n_hc.cotrim_need, 1.0);
+      i_hc.cotrim_mean(art_flag) = 1 - p_hc.cotrim_effect(art_flag) * coverage;
     }
   };
 

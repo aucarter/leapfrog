@@ -556,3 +556,19 @@ test_that("error thrown if trying to output from years before simulation start y
   )
 })
 
+
+test_that("Cotrimoxazole coverage is capped at need", {
+  pjnz <- system.file("pjnz/bwa_aim-no-special-elig-numpmtct.PJNZ", package = "leapfrog")
+  parameters <- process_pjnz(pjnz, extract_child_params = TRUE)
+  parameters$cotrim_val_is_percent[] <- 0L
+  run_with <- function(n) {
+    parameters$cotrim_val[] <- n
+    run_model(parameters, "ChildModel", 1970:2030)
+  }
+  out_big <- run_with(1e9)
+  out_huge <- run_with(1e12)
+  ## Both counts exceed need every year, so both mean 100% coverage
+  expect_equal(out_big$p_hivpop, out_huge$p_hivpop)
+  expect_true(all(out_big$hc1_noart_aids_deaths >= 0))
+  expect_true(all(out_big$hc2_noart_aids_deaths >= 0))
+})
