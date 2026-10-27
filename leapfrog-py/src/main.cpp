@@ -6,7 +6,8 @@ std::vector<std::string> list_model_configurations() {
     "HivFullAgeStratification",
     "HivCoarseAgeStratification",
     "ChildModel",
-    "Spectrum"
+    "Spectrum",
+    "SpectrumPopAdjust"
   };
 }
 
@@ -22,6 +23,8 @@ auto sim_model(const std::string configuration, Args&&... args) {
     return simulate_model<leapfrog::ChildModel>(std::forward<Args>(args)...);
   } else if (configuration == "Spectrum") {
     return simulate_model<leapfrog::Spectrum>(std::forward<Args>(args)...);
+  } else if (configuration == "SpectrumPopAdjust") {
+    return simulate_model<leapfrog::SpectrumPopAdjust>(std::forward<Args>(args)...);
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;
@@ -79,6 +82,8 @@ nb::dict get_leapfrog_ss(const std::string configuration) {
     return leapfrog::get_ss_py<leapfrog::ChildModel>();
   } else if (configuration == "Spectrum") {
     return leapfrog::get_ss_py<leapfrog::Spectrum>();
+  } else if (configuration == "SpectrumPopAdjust") {
+    return leapfrog::get_ss_py<leapfrog::SpectrumPopAdjust>();
   } else {
     const auto available_variants = list_model_configurations();
     std::ostringstream oss;

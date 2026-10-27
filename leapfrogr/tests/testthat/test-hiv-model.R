@@ -253,3 +253,40 @@ test_that("Transmission rate models produces expected epidemics", {
 
 
 })
+
+test_that("population adjustment variants rescale the population to the target", {
+  pjnz <- system.file("pjnz/bwa_aim-no-special-elig-numpmtct.PJNZ", package = "leapfrog")
+  years <- 1970:2030
+  for (coarse in c(FALSE, TRUE)) {
+    base <- if (coarse) "CoarseChildModel" else "Spectrum"
+    p <- process_pjnz(pjnz, use_coarse_age_groups = coarse, extract_child_params = TRUE)
+    ref <- run_model(p, base, years)
+    adjusted <- function(target, final_step) {
+      run_model(c(p, list(targetpop = target, population_adjustment_final_step = as.integer(final_step))),
+                paste0(base, "PopAdjust"), years)
+    }
+
+    ## Target equal to the unadjusted projection: identical to the parent variant
+    same <- adjusted(ref$p_totpop, length(years) - 1)
+    expect_equal(same$p_totpop, ref$p_totpop)
+    expect_equal(same$p_hivpop, ref$p_hivpop)
+    expect_equal(same$h_artpop, ref$h_artpop)
+
+    ## Target 10% above: population equals it and HIV compartments scale with it
+    up <- adjusted(1.1 * ref$p_totpop, length(years) - 1)
+    expect_equal(up$p_totpop[, , -1], 1.1 * ref$p_totpop[, , -1])  # the base year is not adjusted
+    expect_equal(up$p_hivpop[, , 2], 1.1 * ref$p_hivpop[, , 2])
+
+    ## Target with ages 20-29 raised, adjusted through 1980 only: equal to it
+    ## to the final step, projected freely afterwards
+    target <- ref$p_totpop
+    target[21:30, , ] <- 1.1 * target[21:30, , ]
+    stop <- adjusted(target, 10)
+    expect_equal(stop$p_totpop[, , 2:11], target[, , 2:11])
+    expect_false(isTRUE(all.equal(stop$p_totpop[, , 13], target[, , 13])))
+
+    ## Final step 0: no year is adjusted
+    none <- adjusted(1.1 * ref$p_totpop, 0)
+    expect_equal(none$p_totpop, ref$p_totpop)
+  }
+})

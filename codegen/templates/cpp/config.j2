@@ -76,7 +76,7 @@ struct {{ config.name }}Config {
     {{ get_struct_member_def(name, cfg, True)|indent(4) }}
     {%- endfor %}
 
-    OutputState(int output_years):
+    OutputState(int output_years){{ ":" if config.output_state }}
       {% for name, cfg in config.output_state.items() %}
       {{ name }}(shape_{{ name }}({{ collapse(cfg.dims) }})){{ comma_except_last(loop) }}
       {% endfor %}
