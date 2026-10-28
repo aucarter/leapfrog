@@ -34,6 +34,13 @@
       "alias": {
         "r": "paedsurv_artcd4dist"
       }
+    },
+    "entrant_paediatric_survival": {
+      "num_type": "real_type",
+      "dims": ["opts.proj_steps"],
+      "alias": {
+        "r": "paedsurv_lag"
+      }
     }
   },
   "intermediate": {
