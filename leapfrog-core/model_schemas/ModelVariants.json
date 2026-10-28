@@ -64,6 +64,19 @@
     "run_static_entrants": "true",
     "run_population_adjustment": "false"
   },
+  "HivCoarseAgeStratificationEntrantsPopAdjust": {
+    "run_demographic_projection": "true",
+    "run_hiv_simulation": "true",
+    "use_coarse_stratification": "true",
+    "run_child_model": "false",
+    "age10_adult": "false",
+    "age105_open": "false",
+    "run_virgin": "false",
+    "run_spectrum_model": "false",
+    "run_goals": "false",
+    "run_static_entrants": "true",
+    "run_population_adjustment": "true"
+  },
   "ChildModel": {
     "run_demographic_projection": "true",
     "run_hiv_simulation": "true",

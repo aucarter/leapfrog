@@ -533,17 +533,30 @@ struct HivDemographicProjection<Config> {
                   "run_static_age_15_entrants would double-count entrants when "
                   "the child model is simulated");
     const auto& p_en = pars.en;
-    const auto& n_dp = state_next.dp;
+    auto& n_dp = state_next.dp;
     auto& n_ha = state_next.ha;
     constexpr int a0 = p_idx_hiv_first_adult;
 
     for (int s = 0; s < NS; ++s) {
       // The age-15 population comes from the demographic projection, which has
-      // already run for this year; only its HIV+ share is supplied here.
-      const real_type hivp_entrants =
-        n_dp.p_totpop(a0, s) * p_en.entrant_hiv_prevalence(s, t);
+      // already run for this year without paediatric HIV deaths; only its HIV+
+      // share is supplied here.
+      const real_type pop15 = n_dp.p_totpop(a0, s);
+      const real_type prev15 = p_en.entrant_hiv_prevalence(s, t);
+      const real_type hivp_entrants = pop15 * prev15;
       if (!(hivp_entrants > 0.0)) {
         continue;
+      }
+
+      // Children who died of HIV before 15 are missing from the cohort: of the
+      // births that reach 15 HIV+ with probability prev15, a share prev15 /
+      // paedsurv was infected, so the HIV-negative entrants are
+      // pop15 * (1 - prev15 / paedsurv). As eppasm (simmod, no popadjust:
+      // birthslag * cumsurv * (1 - entrantprev / paedsurv_lag)) and EPP's age
+      // model (AgeModel.run_hiv_model). paedsurv = 1 leaves the cohort as is.
+      const real_type paedsurv = p_en.entrant_paediatric_survival(t);
+      if (paedsurv > 0.0 && paedsurv < 1.0) {
+        n_dp.p_totpop(a0, s) = pop15 * (1.0 - prev15 / paedsurv) + hivp_entrants;
       }
 
       const bool art_started = t > opts.ts_art_start;
