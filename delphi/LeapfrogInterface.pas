@@ -932,6 +932,8 @@ type
     entrantCd4DistributionLength: Integer;
     entrantArtCd4Distribution: PDouble;
     entrantArtCd4DistributionLength: Integer;
+    entrantPaediatricSurvival: PDouble;
+    entrantPaediatricSurvivalLength: Integer;
 end;
 
 type
@@ -941,6 +943,7 @@ type
     entrantArtCoverage: TGBFixedArray<Double>;
     entrantCd4Distribution: TGBFixedArray<Double>;
     entrantArtCd4Distribution: TGBFixedArray<Double>;
+    entrantPaediatricSurvival: TGBFixedArray<Double>;
     function getView(): LeapfrogEntrantsParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1847,6 +1850,7 @@ begin;
   entrantArtCoverage.Free;
   entrantCd4Distribution.Free;
   entrantArtCd4Distribution.Free;
+  entrantPaediatricSurvival.Free;
   inherited;
 end;
 
@@ -1865,6 +1869,8 @@ begin;
   Result.entrantCd4DistributionLength := entrantCd4Distribution.GetLength();
   Result.entrantArtCd4Distribution := PDouble(entrantArtCd4Distribution.data);
   Result.entrantArtCd4DistributionLength := entrantArtCd4Distribution.GetLength();
+  Result.entrantPaediatricSurvival := PDouble(entrantPaediatricSurvival.data);
+  Result.entrantPaediatricSurvivalLength := entrantPaediatricSurvival.GetLength();
 end;
 
 function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;
@@ -2154,6 +2160,7 @@ begin;
   entrantArtCoverage.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantArtCoverage');
   entrantCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantCd4Distribution');
   entrantArtCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantArtCd4Distribution');
+  entrantPaediatricSurvival.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantPaediatricSurvival');
 end;
 
 procedure LeapfrogEntrantsState.writeToDisk(dir: string);
