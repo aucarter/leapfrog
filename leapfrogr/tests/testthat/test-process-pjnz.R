@@ -183,6 +183,8 @@ test_that("incidence input carries Spectrum's incidence adjustment factor", {
   p <- process_pjnz(pjnz)
   expect_equal(p$incidinput, raw * iaf, ignore_attr = TRUE)
   expect_false(isTRUE(all.equal(p$incidinput, raw, check.attributes = FALSE)))
+})
+
 test_that("relative infectiousness on ART is read from the DP", {
   pjnz <- system.file("pjnz/bwa_aim-adult-art-no-special-elig_v6.13_2022-04-18.PJNZ", package = "leapfrog")
   dat <- pjnz::read_dp(pjnz)
