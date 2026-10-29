@@ -930,7 +930,7 @@ struct ChildModelSimulation<Config> {
       for (int a = hc2_agestart; a < hcAG_end; ++a) {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc2DS; ++hd) {
-            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, t - 1)) {
+            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, t)) {
               n_hc.cotrim_need += c_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s);
             }
           } // end hc2DS
