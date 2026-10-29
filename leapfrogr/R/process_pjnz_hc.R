@@ -315,7 +315,8 @@ prepare_art_elig <- function(dat, pars, dim_vars, proj_years, year_idx) {
   hc_art_elig_cd4["0", ] <- findInterval(-unname(cd4_elig["CD4 percent: <11 MOS", ]), -paed_cd4_percent_intervals)
   hc_art_elig_cd4[as.character(1:2), ] <- findInterval(-unname(cd4_elig["CD4 percent: 12-35 MOS", ]), -paed_cd4_percent_intervals)
   hc_art_elig_cd4[as.character(3:4), ] <- findInterval(-unname(cd4_elig["CD4 percent: 35-39 MOS", ]), -paed_cd4_percent_intervals)
-  hc_art_elig_cd4[as.character(5:14), ] <- rep(findInterval(-unname(cd4_elig["CD4 count: >=5 YRS", ]), -paed_cd4_number_intervals), each = length(6:15))
+  ## A category is eligible only when its whole range lies below the threshold (Spectrum: CD4 < 250 treats <200, not 200-349)
+  hc_art_elig_cd4[as.character(5:14), ] <- rep(findInterval(-unname(cd4_elig["CD4 count: >=5 YRS", ]), -paed_cd4_number_intervals, left.open = TRUE) + 1L, each = length(6:15))
 
   list(hc_art_elig_age = hc_art_elig_age, hc_art_elig_cd4 = hc_art_elig_cd4)
 }
