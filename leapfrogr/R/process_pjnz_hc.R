@@ -141,6 +141,22 @@ prepare_pmtct <- function(dat, pars, dim_vars, proj_years) {
        pmtct_input_isperc = pmtct_input_isperc)
 }
 
+#' Does the PJNZ follow Spectrum 6.43's child PMTCT and cotrimoxazole rules?
+#'
+#' Spectrum 6.43 (the 2026 estimates) keeps PMTCT need at HIV+ births and caps coverage at it, applies the delivery
+#' retention for women starting ART in pregnancy to Option A and B (no adjustment for Option A/B coverage above the
+#' CD4 >= 350 share), and takes children's cotrimoxazole need from the current year's ART eligibility. Spectrum
+#' 6.37 (the leapfrog test file) does none of these. Versions in between are not verified and get the earlier rules.
+#'
+#' @param valid_vers `<ValidVers MV>` from the DP, e.g. "6.43", "6,43" or "6.38 Beta 18"
+#' @return TRUE for 6.43 and later
+#' @keywords internal
+spectrum_643_child_rules <- function(valid_vers) {
+  v <- sub("^([0-9]+),", "\\1.", trimws(as.character(valid_vers)))
+  v <- suppressWarnings(as.numeric(regmatches(v, regexpr("^[0-9]+(\\.[0-9]+)?", v))))
+  length(v) == 1L && !is.na(v) && v >= 6.43
+}
+
 prepare_pmtct_dropout <- function(dat, pars, dim_vars, proj_years) {
   pmtct_options <- c("Option A", "Option B", "Single dose nevirapine",
                      "WHO 2006 dual ARV regimen", "ART: Started before pregnancy",
@@ -160,9 +176,11 @@ prepare_pmtct_dropout <- function(dat, pars, dim_vars, proj_years) {
   pmtct_dropout[, "Delivery", ] <- 100
   pmtct_dropout["ART: Started before pregnancy", "Delivery", ] <- pars$percent_art_delivery["Percent already on ART retained at delivery", ]
   pmtct_dropout["ART: Started during pregnancy >4 weeks", "Delivery", ] <- pars$percent_art_delivery["Percent starting ART retained at delivery", ]
-  ## Spectrum applies the same retention at delivery to Option A and Option B (women not retained transmit at
-  ## the untreated rate); without it Option A/B years run 0.25-2.8 pts below Spectrum's MTCTRate6Wks
-  pmtct_dropout[c("Option A", "Option B"), "Delivery", ] <- rep(pars$percent_art_delivery["Percent starting ART retained at delivery", ], each = 2)
+  ## Spectrum 6.43 applies the same retention at delivery to Option A and Option B (women not retained transmit at
+  ## the untreated rate); without it Option A/B years run 0.25-2.8 pts below its MTCTRate6Wks. 6.37 does not.
+  if (spectrum_643_child_rules(pars$valid_vers)) {
+    pmtct_dropout[c("Option A", "Option B"), "Delivery", ] <- rep(pars$percent_art_delivery["Percent starting ART retained at delivery", ], each = 2)
+  }
   pmtct_dropout[pmtct_dropout_eligible, "<12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
                                                                                               c("Monthly dropout breastfeeding: ART 0-12 months breastfeeding"), ], each = 5)
   pmtct_dropout[pmtct_dropout_eligible, ">12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
@@ -523,6 +541,7 @@ process_pjnz_hc <- function(dat, pars, dim_vars, dp_params, use_coarse_age_group
     infant_pop = infant_pop,
     mat_hiv_births = mat_hiv_births,
     mat_prev_input = mat_prev_input,
+    hc_spectrum_643_rules = rep(as.integer(spectrum_643_child_rules(pars$valid_vers)), length(proj_years)),
     prop_lt200 = prop_lt200,
     prop_gte350 = prop_gte350,
     cotrim_val_is_percent = cotrim_val_is_percent,

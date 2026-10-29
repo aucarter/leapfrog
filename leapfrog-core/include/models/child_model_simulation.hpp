@@ -274,10 +274,9 @@ struct ChildModelSimulation<Config> {
       sumARV += p_hc.PMTCT(hp, t);
     }
 
-    // Spectrum keeps the need at HIV+ births and caps the number covered at it;
-    // raising the need to the regimen total when that exceeds births inflates
-    // perinatal infections and undercounts HIV-negative mothers (births - need)
-    n_hc.pmtct_need = n_ha.hiv_births;
+    // Spectrum 6.43 keeps the need at HIV+ births and caps the number covered at it; earlier versions (6.37, the
+    // leapfrog test file) raise the need to the regimen total when that exceeds births
+    n_hc.pmtct_need = p_hc.hc_spectrum_643_rules(t) ? n_ha.hiv_births : std::max(sumARV, n_ha.hiv_births);
 
     i_hc.on_PMTCT = sumARV + p_hc.patients_reallocated(t);
     i_hc.on_PMTCT = std::min(i_hc.on_PMTCT, n_hc.pmtct_need);
@@ -394,8 +393,17 @@ struct ChildModelSimulation<Config> {
     // calc_wlhiv_cd4_proportion() also sets the untreated CD4 mix, so it is still called here.
     calc_wlhiv_cd4_proportion();
 
-    i_hc.optA_transmission_rate = p_hc.PMTCT_transmission_rate(0, 0, 0);
-    i_hc.optB_transmission_rate = p_hc.PMTCT_transmission_rate(0, 1, 0);
+    // Before 6.43 (6.37, the leapfrog test file): the AIM manual's adjustment for Option A/B coverage above the
+    // CD4 >= 350 share, and no delivery retention for Option A/B (set in the reader)
+    real_type excessratio = 0.0;
+    if (!p_hc.hc_spectrum_643_rules(t)) {
+      const auto option_A_B_coverage = i_hc.PMTCT_coverage(0) + i_hc.PMTCT_coverage(1);
+      if (option_A_B_coverage > i_hc.prop_wlhiv_gte350 && i_hc.prop_wlhiv_gte350 > 0) {
+        excessratio = option_A_B_coverage / i_hc.prop_wlhiv_gte350 - 1;
+      }
+    }
+    i_hc.optA_transmission_rate = p_hc.PMTCT_transmission_rate(0, 0, 0) * (1 + excessratio);
+    i_hc.optB_transmission_rate = p_hc.PMTCT_transmission_rate(0, 1, 0) * (1 + excessratio);
   };
 
   void adjust_option_A_B_bf_tr() {
@@ -924,13 +932,14 @@ struct ChildModelSimulation<Config> {
       } // end hc2_agestart
     } // end NS
 
-    // All ART eligible children ages 5-14 eligible: Spectrum uses the lagged population but the current year's
-    // eligibility (with t - 1, ZWE 2026's 2010 eligibility change gave 3% too few off-ART child deaths that year)
+    // All ART eligible children ages 5-14 eligible: Spectrum 6.43 uses the lagged population but the current year's
+    // eligibility (with t - 1, ZWE 2026's 2010 eligibility change gave 3% too few off-ART child deaths that year);
+    // earlier versions (6.37, the leapfrog test file) use the previous year's
     for (int s = 0; s < NS; ++s) {
       for (int a = hc2_agestart; a < hcAG_end; ++a) {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc2DS; ++hd) {
-            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, t)) {
+            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, p_hc.hc_spectrum_643_rules(t) ? t : t - 1)) {
               n_hc.cotrim_need += c_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s);
             }
           } // end hc2DS
