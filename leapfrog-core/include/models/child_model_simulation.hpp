@@ -386,20 +386,16 @@ struct ChildModelSimulation<Config> {
     const auto& p_hc = pars.hc;
     auto& i_hc = intermediate.hc;
 
-    // Option A and B were only authorized for women with greater than 350 CD4, so if the percentage of women
-    // on option A/B > the proportion of women in this cd4 category, we assume that some must have a cd4 less than 350
-    // option AB will be less effective for these women so we adjust for that
+    // Spectrum 6.43 applies the Option A/B peripartum rates as input, without the AIM manual's adjustment for
+    // Option A/B coverage above the CD4 >= 350 share; the women Option A/B does not protect are those not
+    // retained at delivery (PMTCT_dropout, "Percent starting ART retained at delivery"), who transmit at the
+    // untreated rate. Reproduces Spectrum's MTCTRate6Wks to 0.01 pts in every Option A/B year of the 2026
+    // KEN, MOZ, TZA, UGA and ZWE files; with the adjustment it was up to 0.5 pts high where it fired.
+    // calc_wlhiv_cd4_proportion() also sets the untreated CD4 mix, so it is still called here.
     calc_wlhiv_cd4_proportion();
 
-    const auto option_A_B_coverage = i_hc.PMTCT_coverage(0) + i_hc.PMTCT_coverage(1);
-    real_type excessratio = 0.0;
-    if (option_A_B_coverage > i_hc.prop_wlhiv_gte350) {
-      if (i_hc.prop_wlhiv_gte350 > 0) {
-        excessratio = option_A_B_coverage / i_hc.prop_wlhiv_gte350 - 1;
-      }
-    }
-    i_hc.optA_transmission_rate = p_hc.PMTCT_transmission_rate(0, 0, 0) * (1 + excessratio);
-    i_hc.optB_transmission_rate = p_hc.PMTCT_transmission_rate(0, 1, 0) * (1 + excessratio);
+    i_hc.optA_transmission_rate = p_hc.PMTCT_transmission_rate(0, 0, 0);
+    i_hc.optB_transmission_rate = p_hc.PMTCT_transmission_rate(0, 1, 0);
   };
 
   void adjust_option_A_B_bf_tr() {
