@@ -168,6 +168,8 @@ test_that("projection period follows the Spectrum version the file was saved wit
   expect_equal(spectrum_projection_period("6.13"), "midyear")
   expect_equal(spectrum_projection_period("5.1"), "midyear")
   expect_error(spectrum_projection_period("unknown"), "Could not read")
+})
+
 test_that("incidence input carries Spectrum's incidence adjustment factor", {
   pjnz <- system.file("pjnz", "Botswana2018.PJNZ", package = "pjnz")
   skip_if(!nzchar(pjnz), "pjnz test file not available")
