@@ -423,6 +423,11 @@ struct HivDemographicProjection<Config> {
     const auto& c_hc = state_curr.hc;
     auto& i_hc = intermediate.hc;
 
+    // EXPERIMENT (AIM manual 6.1.7.3.3, Table 8): 15-year-olds enter adult CD4 categories (>500 ... <50) by fixed
+    // distributions, untreated by column 2 and on ART by column 3, whatever their CD4 category at age 14
+    static constexpr real_type age15_cd4_untreated[7] = {0.06, 0.11, 0.11, 0.07, 0.14, 0.23, 0.28};
+    static constexpr real_type age15_cd4_art[7] = {0.0, 0.0, 0.11, 0.23, 0.23, 0.14, 0.29};
+
     for (int s = 0; s < NS; ++s) {
       for (int hm = 0; hm < hDS; ++hm) {
         i_hc.age15_hivpop(hm, s) = 0.0;
@@ -431,14 +436,14 @@ struct HivDemographicProjection<Config> {
           for (int htm = 0; htm < hcTT; ++htm) {
             age15_hivpop_hm_adol += c_hc.hc2_hivpop(hm_adol, htm, (hc2AG - 1), s);
           }
-          i_hc.age15_hivpop(hm, s) += age15_hivpop_hm_adol * SS::hc2_to_ha_cd4_transition[hm][hm_adol];
+          i_hc.age15_hivpop(hm, s) += age15_hivpop_hm_adol * age15_cd4_untreated[hm];
         }
 
         if (t > p_hc.hc_art_start) {
           for (int hu = 0; hu < hTS; ++hu) {
             i_hc.age15_artpop(hu, hm, s) = 0.0;
             for (int hm_adol = 0; hm_adol < hc2DS; ++hm_adol) {
-              i_hc.age15_artpop(hu, hm, s) += c_hc.hc2_artpop(hu, hm_adol, (hc2AG - 1), s)  * SS::hc2_to_ha_cd4_transition[hm][hm_adol];
+              i_hc.age15_artpop(hu, hm, s) += c_hc.hc2_artpop(hu, hm_adol, (hc2AG - 1), s)  * age15_cd4_art[hm];
             }
           }
         }
