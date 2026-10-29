@@ -60,6 +60,14 @@ test_that("process_pjnz use_coarse_age_groups changes HIV age stratification dim
   expect_equal(dim(pars_full$art_mort),   c(3, 7, 66, 2), ignore_attr = TRUE)
   expect_equal(dim(pars_coarse$art_mort), c(3, 7,  9, 2), ignore_attr = TRUE)
 
+  # Spectrum's adult HIV parameters are by age 15-24, 25-34, 35-44, 45+: each
+  # single age carries the value of the coarse group it falls in
+  coarse_of_age <- rep(1:9, c(2, 3, 5, 5, 5, 5, 5, 5, 31))
+  for (p in c("cd4_mort", "cd4_prog", "cd4_initdist")) {
+    expect_equal(pars_full[[p]], pars_coarse[[p]][, coarse_of_age, ], ignore_attr = TRUE)
+  }
+  expect_equal(pars_full$art_mort, pars_coarse$art_mort[, , coarse_of_age, ], ignore_attr = TRUE)
+
   # Demographic parameters are unaffected by age stratification choice
   expect_equal(dim(pars_full$basepop), dim(pars_coarse$basepop))
   expect_equal(dim(pars_full$Sx),      dim(pars_coarse$Sx))
