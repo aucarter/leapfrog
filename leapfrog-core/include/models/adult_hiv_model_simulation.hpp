@@ -648,33 +648,28 @@ struct AdultHivModelSimulation<Config> {
       const int hf = ha - hIDX_15PLUS;
       if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility) {
         const auto& p_dp = pars.dp;
-        const auto& c_dp = state_curr.dp;
         const auto& n_dp = state_next.dp;
         int a0 = p_idx_hiv_first_adult;
         for (int h = 0; h < ha; ++h) a0 += hAG_span[h];
 
+        // EXPERIMENT (AIM manual 6.1.7.6): HIV+ untreated women x fertility rate x FRR / (FRR x prev + 1 - prev),
+        // prev = untreated HIV+ share of women (women on ART at HIV-negative fertility), FRR = fert_mult_by_age
+        // without the local adjustment factor, no CD4-specific fertility factor
+        real_type women_ha = 0.0;
         real_type births_ha = 0.0;
-        real_type frr_pop_ha = 0.0;
         for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
-          births_ha += 0.5 * (c_dp.p_totpop(a, s) + n_dp.p_totpop(a, s)) *
-                       p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
-          frr_pop_ha += i_ha.hiv_negative_pop(a, s);
+          women_ha += n_dp.p_totpop(a, s);
+          births_ha += n_dp.p_totpop(a, s) * p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
         }
-        for (int hm = 0; hm < hDS; ++hm) {
-          const real_type frr_cd4 = p_ha.local_adj_factor * p_ha.fert_mult_by_age(hf, t) *
-                                    p_ha.fert_mult_off_art(hm);
-          frr_pop_ha += frr_cd4 * n_ha.h_hivpop(hm, ha, s);
-          for (int hu = 0; hu < hTS; ++hu) {
-            const real_type frr_art = hu == 0 ? frr_cd4 :
-              p_ha.local_adj_factor * p_ha.fert_mult_on_art(hf);
-            frr_pop_ha += frr_art * n_ha.h_artpop(hu, hm, ha, s);
-          }
-        }
-        if (frr_pop_ha > 0.0) {
+        real_type untreated_ha = 0.0;
+        for (int hm = 0; hm < hDS; ++hm) untreated_ha += n_ha.h_hivpop(hm, ha, s);
+        if (women_ha > 0.0) {
+          const real_type fert = births_ha / women_ha;
+          const real_type prev = untreated_ha / women_ha;
+          const real_type frr = p_ha.fert_mult_by_age(hf, t);
+          const real_type preg = fert * frr / (frr * prev + 1.0 - prev);
           for (int hm = i_ha.anyelig_idx; hm < cd4elig_idx; ++hm) {
-            const real_type frr_cd4 = p_ha.local_adj_factor * p_ha.fert_mult_by_age(hf, t) *
-                                      p_ha.fert_mult_off_art(hm);
-            const real_type pw_elig = births_ha * frr_cd4 * n_ha.h_hivpop(hm, ha, s) / frr_pop_ha;
+            const real_type pw_elig = preg * n_ha.h_hivpop(hm, ha, s);
             i_ha.artelig_hahm(hm, hf) += pw_elig;
             i_ha.artelig_hm(hm) += pw_elig;
             i_ha.Xartelig_15plus += pw_elig;
