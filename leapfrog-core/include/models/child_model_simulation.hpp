@@ -389,8 +389,8 @@ struct ChildModelSimulation<Config> {
     // Spectrum 6.43 applies the Option A/B peripartum rates as input, without the AIM manual's adjustment for
     // Option A/B coverage above the CD4 >= 350 share; the women Option A/B does not protect are those not
     // retained at delivery (PMTCT_dropout, "Percent starting ART retained at delivery"), who transmit at the
-    // untreated rate. Reproduces Spectrum's MTCTRate6Wks to 0.01 pts in every Option A/B year of the 2026
-    // KEN, MOZ, TZA, UGA and ZWE files; with the adjustment it was up to 0.5 pts high where it fired.
+    // untreated rate. Against Spectrum's MTCTRate6Wks in the 2026 Option A/B years: KEN, MOZ and ZWE within
+    // 0.01 pts, TZA 2012 and UGA 2012-13 0.07-0.11 pts high (from up to 2.7 pts low before).
     // calc_wlhiv_cd4_proportion() also sets the untreated CD4 mix, so it is still called here.
     calc_wlhiv_cd4_proportion();
 
