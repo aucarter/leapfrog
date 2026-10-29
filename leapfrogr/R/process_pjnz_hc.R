@@ -328,36 +328,25 @@ prepare_art_mort <- function(dat, pars, dim_vars) {
   ages_5to14 = as.character(5:14)
 
 
-  mort_lt6 <- pars$child_mort_by_cd4_with_art_0to6
-  mort_7to12 <- pars$child_mort_by_cd4_with_art_7to12
-  mort_gt12 <- pars$child_mort_by_cd4_with_art_gt12
-  ##TODO: stratify this by sex
-  hc1_art_mort <- array(data = 0, dim = c(length(dim_vars$cd4_perc_0to4), length(time_art), length(ages_less5)), dimnames = list(cd4 = dim_vars$cd4_perc_0to4,
-                                                                    transmission = time_art,
-                                                                    age = ages_less5))
-  hc2_art_mort <- array(data = 0, dim = c(length(hc2_cd4_cat), length(time_art), length(ages_5to14)), dimnames = list(cd4 = hc2_cd4_cat,
-                                                                     transmission = time_art,
-                                                                     age = ages_5to14))
-  ## 0-6 mo on treatment
-  hc1_art_mort[, "0to6mo", "0"] <- mort_lt6["male", grepl("0: ", colnames(mort_lt6))]
-  hc1_art_mort[, "0to6mo", ages_1to2] <- mort_lt6["male", grepl("1-2: ", colnames(mort_lt6))]
-  hc1_art_mort[, "0to6mo", ages_3to4] <- mort_lt6["male", grepl("3-4: ", colnames(mort_lt6))]
-  hc2_art_mort[, "0to6mo", ages_5to9] <- mort_lt6["male", grepl("5-9: ", colnames(mort_lt6))]
-  hc2_art_mort[, "0to6mo", ages_10to14] <- mort_lt6["male", grepl("10-14: ", colnames(mort_lt6))]
-
-  ## 7-12 mo on treatment
-  hc1_art_mort[, "7to12mo", "0"] <- mort_7to12["male",grepl("0: ", colnames(mort_7to12))]
-  hc1_art_mort[, "7to12mo", ages_1to2] <- mort_7to12["male", grepl("1-2: ", colnames(mort_7to12))]
-  hc1_art_mort[, "7to12mo", ages_3to4] <- mort_7to12["male", grepl("3-4: ", colnames(mort_7to12))]
-  hc2_art_mort[, "7to12mo", ages_5to9] <- mort_7to12["male", grepl("5-9: ", colnames(mort_7to12))]
-  hc2_art_mort[, "7to12mo", ages_10to14] <- mort_7to12["male", grepl("10-14: ", colnames(mort_7to12))]
-
-  ## 12+ mo on treatment
-  hc1_art_mort[, "12+mo", "0"] <- mort_gt12["male", grepl("0: ", colnames(mort_gt12))]
-  hc1_art_mort[, "12+mo", ages_1to2] <- mort_gt12["male", grepl("1-2: ", colnames(mort_gt12))]
-  hc1_art_mort[, "12+mo", ages_3to4] <- mort_gt12["male", grepl("3-4: ", colnames(mort_gt12))]
-  hc2_art_mort[, "12+mo", ages_5to9] <- mort_gt12["male", grepl("5-9: ", colnames(mort_gt12))]
-  hc2_art_mort[, "12+mo", ages_10to14] <- mort_gt12["male", grepl("10-14: ", colnames(mort_gt12))]
+  mort <- list("0to6mo" = pars$child_mort_by_cd4_with_art_0to6,
+               "7to12mo" = pars$child_mort_by_cd4_with_art_7to12,
+               "12+mo" = pars$child_mort_by_cd4_with_art_gt12)
+  sexes <- c("male", "female")
+  ## Spectrum's on-ART mortality differs by sex (females 2-4% lower under 5, ~17% lower at 5-14)
+  hc1_art_mort <- array(data = 0, dim = c(length(dim_vars$cd4_perc_0to4), length(time_art), length(ages_less5), length(sexes)),
+                        dimnames = list(cd4 = dim_vars$cd4_perc_0to4, transmission = time_art, age = ages_less5, sex = sexes))
+  hc2_art_mort <- array(data = 0, dim = c(length(hc2_cd4_cat), length(time_art), length(ages_5to14), length(sexes)),
+                        dimnames = list(cd4 = hc2_cd4_cat, transmission = time_art, age = ages_5to14, sex = sexes))
+  for (tm in time_art) {
+    m <- mort[[tm]]
+    for (sx in sexes) {
+      hc1_art_mort[, tm, "0", sx] <- m[sx, grepl("0: ", colnames(m))]
+      hc1_art_mort[, tm, ages_1to2, sx] <- m[sx, grepl("1-2: ", colnames(m))]
+      hc1_art_mort[, tm, ages_3to4, sx] <- m[sx, grepl("3-4: ", colnames(m))]
+      hc2_art_mort[, tm, ages_5to9, sx] <- m[sx, grepl("5-9: ", colnames(m))]
+      hc2_art_mort[, tm, ages_10to14, sx] <- m[sx, grepl("10-14: ", colnames(m))]
+    }
+  }
 
   list(hc1_art_mort = hc1_art_mort,
        hc2_art_mort = hc2_art_mort)

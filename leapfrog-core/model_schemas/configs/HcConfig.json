@@ -102,11 +102,11 @@
       },
       "hc1_art_mort": {
         "num_type": "real_type",
-        "dims": ["SS::hc1DS", "SS::hTS", "SS::hc1AG"]
+        "dims": ["SS::hc1DS", "SS::hTS", "SS::hc1AG", "SS::NS"]
       },
       "hc2_art_mort": {
         "num_type": "real_type",
-        "dims": ["SS::hc2DS", "SS::hTS", "SS::hc2AG"]
+        "dims": ["SS::hc2DS", "SS::hTS", "SS::hc2AG", "SS::NS"]
       },
       "hc_art_isperc": {
         "num_type": "int",
