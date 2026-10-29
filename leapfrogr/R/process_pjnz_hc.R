@@ -160,6 +160,9 @@ prepare_pmtct_dropout <- function(dat, pars, dim_vars, proj_years) {
   pmtct_dropout[, "Delivery", ] <- 100
   pmtct_dropout["ART: Started before pregnancy", "Delivery", ] <- pars$percent_art_delivery["Percent already on ART retained at delivery", ]
   pmtct_dropout["ART: Started during pregnancy >4 weeks", "Delivery", ] <- pars$percent_art_delivery["Percent starting ART retained at delivery", ]
+  ## Spectrum applies the same retention at delivery to Option A and Option B (women not retained transmit at
+  ## the untreated rate); without it Option A/B years run 0.25-2.8 pts below Spectrum's MTCTRate6Wks
+  pmtct_dropout[c("Option A", "Option B"), "Delivery", ] <- rep(pars$percent_art_delivery["Percent starting ART retained at delivery", ], each = 2)
   pmtct_dropout[pmtct_dropout_eligible, "<12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
                                                                                               c("Monthly dropout breastfeeding: ART 0-12 months breastfeeding"), ], each = 5)
   pmtct_dropout[pmtct_dropout_eligible, ">12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
