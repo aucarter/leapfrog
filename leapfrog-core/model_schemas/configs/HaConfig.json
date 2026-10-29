@@ -110,6 +110,17 @@
         "r": "artcd4elig_idx"
       }
     },
+    "specpop_percelig": {
+      "num_type": "real_type",
+      "dims": ["opts.proj_steps"]
+    },
+    "pw_artelig": {
+      "num_type": "int",
+      "dims": ["opts.proj_steps"]
+    },
+    "who34percelig": {
+      "num_type": "real_type"
+    },
     "art_mortality": {
       "num_type": "real_type",
       "dims": ["SS::hTS", "SS::hDS", "SS::hAG", "SS::NS"],

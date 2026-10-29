@@ -67,8 +67,20 @@ struct AdultHivModelSimulation<Config> {
     const auto& p_ha = pars.ha;
     auto& i_ha = intermediate.ha;
 
-    i_ha.everARTelig_idx = p_ha.idx_hm_elig(t) < hDS ? p_ha.idx_hm_elig(t) : hDS;
-    i_ha.anyelig_idx = p_ha.idx_hm_elig(t);
+    // Lowest CD4 stage anyone is eligible at this year: every stage once special
+    // populations or pregnant women are eligible regardless of CD4, stage 2
+    // (WHO stage 3/4) when that is set, otherwise the CD4 threshold. The stage
+    // ever eligible ratchets down over time. As EPP's age model
+    // (AgeModel.run_hiv_model, anyelig_idx / everARTelig_idx) and eppasm.
+    auto anyelig_at = [&](int tt) {
+      if (p_ha.specpop_percelig(tt) > 0.0 || p_ha.pw_artelig(tt) > 0) return 0;
+      if (p_ha.who34percelig > 0.0) return 2;
+      return p_ha.idx_hm_elig(tt);
+    };
+    i_ha.anyelig_idx = anyelig_at(t);
+    int ever = hDS;
+    for (int tt = 1; tt <= t; ++tt) ever = std::min(ever, anyelig_at(tt));
+    i_ha.everARTelig_idx = ever;
 
     if (p_ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS) {
 
@@ -603,11 +615,15 @@ struct AdultHivModelSimulation<Config> {
     nda::fill(i_ha.artelig_hm, 0.0);
     nda::fill(i_ha.expect_mort_artelig_hm, 0.0);
 
+    const int cd4elig_idx = p_ha.idx_hm_elig(t);
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
       for (int hm = i_ha.everARTelig_idx; hm < hDS; ++hm) {
         if (hm >= i_ha.anyelig_idx) {
-          // TODO: Implement special population ART eligibility
-          const real_type prop_elig = 1.0;
+          // Special populations: below the CD4 threshold a share
+          // specpop_percelig is eligible (with WHO stage 3/4 from stage 2)
+          const real_type prop_elig = hm >= cd4elig_idx ? 1.0 :
+            (hm >= 2 ? 1.0 - (1.0 - p_ha.specpop_percelig(t)) * (1.0 - p_ha.who34percelig) :
+                       p_ha.specpop_percelig(t));
           const real_type artelig = prop_elig * n_ha.h_hivpop(hm, ha, s);
           i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) = artelig;
           i_ha.artelig_hm(hm) += artelig;
@@ -621,6 +637,51 @@ struct AdultHivModelSimulation<Config> {
         for (int hu = 0; hu < hTS; ++hu) {
           i_ha.Xart_15plus += n_ha.h_artpop(hu, hm, ha, s) +
                               opts.dt * i_ha.gradART(hu, hm, ha, s);
+        }
+      }
+
+      // Pregnant women below the CD4 threshold (e.g. Option B+): in each stage
+      // the eligible number is the age group's births times the FRR-weighted
+      // HIV+ share of its women, as EPP's age model (AgeModel.run_hiv_model,
+      // pw_artelig) and eppasm. Births use the women averaged over the
+      // previous and current year.
+      const int hf = ha - hIDX_15PLUS;
+      if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility) {
+        const auto& p_dp = pars.dp;
+        const auto& c_dp = state_curr.dp;
+        const auto& n_dp = state_next.dp;
+        int a0 = p_idx_hiv_first_adult;
+        for (int h = 0; h < ha; ++h) a0 += hAG_span[h];
+
+        real_type births_ha = 0.0;
+        real_type frr_pop_ha = 0.0;
+        for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
+          births_ha += 0.5 * (c_dp.p_totpop(a, s) + n_dp.p_totpop(a, s)) *
+                       p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
+          frr_pop_ha += i_ha.hiv_negative_pop(a, s);
+        }
+        for (int hm = 0; hm < hDS; ++hm) {
+          const real_type frr_cd4 = p_ha.local_adj_factor * p_ha.fert_mult_by_age(hf, t) *
+                                    p_ha.fert_mult_off_art(hm);
+          frr_pop_ha += frr_cd4 * n_ha.h_hivpop(hm, ha, s);
+          for (int hu = 0; hu < hTS; ++hu) {
+            const real_type frr_art = hu == 0 ? frr_cd4 :
+              p_ha.local_adj_factor * p_ha.fert_mult_on_art(hf);
+            frr_pop_ha += frr_art * n_ha.h_artpop(hu, hm, ha, s);
+          }
+        }
+        if (frr_pop_ha > 0.0) {
+          for (int hm = i_ha.anyelig_idx; hm < cd4elig_idx; ++hm) {
+            const real_type frr_cd4 = p_ha.local_adj_factor * p_ha.fert_mult_by_age(hf, t) *
+                                      p_ha.fert_mult_off_art(hm);
+            const real_type pw_elig = births_ha * frr_cd4 * n_ha.h_hivpop(hm, ha, s) / frr_pop_ha;
+            i_ha.artelig_hahm(hm, hf) += pw_elig;
+            i_ha.artelig_hm(hm) += pw_elig;
+            i_ha.Xartelig_15plus += pw_elig;
+            const real_type expect_mort = p_ha.cd4_mortality(hm, ha, s) * pw_elig;
+            i_ha.expect_mort_artelig_hm(hm) += expect_mort;
+            i_ha.expect_mort_artelig15plus += expect_mort;
+          }
         }
       }
     }
