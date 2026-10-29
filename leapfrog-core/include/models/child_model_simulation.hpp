@@ -274,7 +274,10 @@ struct ChildModelSimulation<Config> {
       sumARV += p_hc.PMTCT(hp, t);
     }
 
-    n_hc.pmtct_need = std::max(sumARV, n_ha.hiv_births);
+    // Spectrum keeps the need at HIV+ births and caps the number covered at it;
+    // raising the need to the regimen total when that exceeds births inflates
+    // perinatal infections and undercounts HIV-negative mothers (births - need)
+    n_hc.pmtct_need = n_ha.hiv_births;
 
     i_hc.on_PMTCT = sumARV + p_hc.patients_reallocated(t);
     i_hc.on_PMTCT = std::min(i_hc.on_PMTCT, n_hc.pmtct_need);
@@ -287,24 +290,25 @@ struct ChildModelSimulation<Config> {
       sumARV = sumARV * n_hc.pmtct_need;
     } else {
       for (int hp = 0; hp < hPS; ++hp) {
-        if (sumARV == 0) {
+        if (sumARV == 0 || n_hc.pmtct_need == 0) {
           i_hc.PMTCT_coverage(hp) = 0.0;
         } else {
           i_hc.PMTCT_coverage(hp) = p_hc.PMTCT(hp, t) / sumARV *
             i_hc.on_PMTCT / n_hc.pmtct_need;
           if(hp == BPLUS_BEFORE){
             //Dropped off ART, started before
-            n_hc.mtct_by_source_women(BPLUS_BEFORE_DROPOUT) += p_hc.PMTCT(hp, t) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //number
             // n_hc.mtct_by_source_women(OPTION_A) += p_hc.PMTCT(hp, t) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //number
             i_hc.PMTCT_before_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
+            n_hc.mtct_by_source_women(BPLUS_BEFORE_DROPOUT) += i_hc.PMTCT_before_dropout * n_hc.pmtct_need; //number
           }
           if(hp == BPLUS_EARLY){
             //Dropped off ART, started during
-            n_hc.mtct_by_source_women(BPLUS_DURING_DROPOUT) += p_hc.PMTCT(hp, t) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //number
             i_hc.PMTCT_during_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
+            n_hc.mtct_by_source_women(BPLUS_DURING_DROPOUT) += i_hc.PMTCT_during_dropout * n_hc.pmtct_need; //number
           }
           i_hc.PMTCT_coverage(hp) *=  p_hc.PMTCT_dropout(hp, 0, t);
-          n_hc.mtct_by_source_women(hp) += p_hc.PMTCT(hp, t) * p_hc.PMTCT_dropout(hp, 0, t);
+          // women covered, consistent with the capped coverage
+          n_hc.mtct_by_source_women(hp) += i_hc.PMTCT_coverage(hp) * n_hc.pmtct_need;
 
         }
 
