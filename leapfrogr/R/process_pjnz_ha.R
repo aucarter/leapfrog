@@ -106,7 +106,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   ## Hard coded to expand age groups 15-24, 25-34, 35-44, 45+ to
   ## single-year ages 15:80.
   ## Requires extension for coarse HIV age group stratification
-  idx_expand_full <- rep(1L, 66L)
+  idx_expand_full <- rep(1:4, times = c(10, 10, 10, 36))
   idx_expand_coarse <- rep(1:4, times = c(3, 2, 2, 2))
   idx_expand <- if (use_coarse_age_groups) idx_expand_coarse else idx_expand_full
 
