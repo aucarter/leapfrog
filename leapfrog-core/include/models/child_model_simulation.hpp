@@ -924,13 +924,13 @@ struct ChildModelSimulation<Config> {
       } // end hc2_agestart
     } // end NS
 
-    // All ART eligible children ages 5-14 eligible
-    // Spectrum uses a lagged population and eligibility for children over five (TODO: verify, noted in issue #274)
+    // All ART eligible children ages 5-14 eligible: Spectrum uses the lagged population but the current year's
+    // eligibility (with t - 1, ZWE 2026's 2010 eligibility change gave 3% too few off-ART child deaths that year)
     for (int s = 0; s < NS; ++s) {
       for (int a = hc2_agestart; a < hcAG_end; ++a) {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc2DS; ++hd) {
-            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, t - 1)) {
+            if (a < p_hc.hc_art_elig_age(t) || hd >= p_hc.hc_art_elig_cd4(a, t)) {
               n_hc.cotrim_need += c_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s);
             }
           } // end hc2DS
