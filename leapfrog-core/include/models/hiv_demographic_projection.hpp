@@ -435,10 +435,13 @@ struct HivDemographicProjection<Config> {
         }
 
         if (t > p_hc.hc_art_start) {
+          // Children on ART enter the adult model in the longest ART duration, whatever their child duration
+          // (Spectrum 6.43, ChAged14ByCD4Cat against age-15 deaths and ART; adult first-year ART mortality otherwise
+          // applies to children already on treatment)
+          for (int hu = 0; hu < hTS; ++hu) i_hc.age15_artpop(hu, hm, s) = 0.0;
           for (int hu = 0; hu < hTS; ++hu) {
-            i_hc.age15_artpop(hu, hm, s) = 0.0;
             for (int hm_adol = 0; hm_adol < hc2DS; ++hm_adol) {
-              i_hc.age15_artpop(hu, hm, s) += c_hc.hc2_artpop(hu, hm_adol, (hc2AG - 1), s)  * SS::hc2_to_ha_cd4_transition[hm][hm_adol];
+              i_hc.age15_artpop(hTS - 1, hm, s) += c_hc.hc2_artpop(hu, hm_adol, (hc2AG - 1), s)  * SS::hc2_to_ha_cd4_transition[hm][hm_adol];
             }
           }
         }
