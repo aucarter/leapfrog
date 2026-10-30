@@ -621,6 +621,20 @@ struct HivDemographicProjection<Config> {
           migrants * (1.0 - pregprev_lag * p_en.entrant_net_migration_hiv_prob) +
           hivp_entrants;
       }
+      // This year's births were taken from the age-15 women before they were
+      // replaced; EPP's age model and eppasm take them after (births_by_ha
+      // follows the entrants), so births and the age-0 cohort move with the
+      // change in age-15 women.
+      if (s == FEMALE && a0 >= p_idx_fertility_first && n_dp.births > 0.0) {
+        const real_type d_births = 0.5 * (n_dp.p_totpop(a0, s) - pop15) *
+          pars.dp.age_specific_fertility_rate(a0 - p_idx_fertility_first, t);
+        const real_type ratio = (n_dp.births + d_births) / n_dp.births;
+        n_dp.births += d_births;
+        for (int g = 0; g < NS; ++g) {
+          n_dp.p_totpop(0, g) *= ratio;
+          n_dp.p_deaths_background_totpop(0, g) *= ratio;
+        }
+      }
       if (!(hivp_entrants > 0.0)) {
         continue;
       }
