@@ -645,14 +645,24 @@ struct HivDemographicProjection<Config> {
       // (AgeModel.run_hiv_model): the untreated pool takes only the share off
       // ART every year and the share on ART enters no CD4-stratified pool
       // before ART starts, only the single-age HIV+ population.
+      // pop15 has survived the year at age 15; the HIV+ entrants go into the
+      // stratified pools before that, with their non-HIV deaths booked at
+      // age 15, so run_hiv_and_art_stratified_deaths_and_migration() applies
+      // one rate over entrants and residents of the age group, as EPP's age
+      // model (entrants, then deathmigrate_ha) and eppasm do. Without this the
+      // entrants were survived twice and the residents too little.
+      const real_type surv15 = pars.dp.survival_probability(a0, s, t);
+      const real_type hivp_entering = surv15 > 0.0 ? hivp_entrants / surv15 : hivp_entrants;
+      n_ha.p_deaths_background_hivpop(a0, s) += hivp_entering - hivp_entrants;
+
       const bool art_started = t > opts.ts_art_start;
       const real_type artcov = p_en.entrant_art_coverage(s, t);
       const bool drop_art = !art_started && p_en.entrant_art_before_art_start == 1;
       const real_type entrants_no_art =
-        art_started || drop_art ? hivp_entrants * (1.0 - artcov) : hivp_entrants;
-      const real_type entrants_art = art_started ? hivp_entrants * artcov : 0.0;
+        art_started || drop_art ? hivp_entering * (1.0 - artcov) : hivp_entering;
+      const real_type entrants_art = art_started ? hivp_entering * artcov : 0.0;
 
-      n_ha.p_hivpop(a0, s) += hivp_entrants;
+      n_ha.p_hivpop(a0, s) += hivp_entering;
 
       for (int hm = 0; hm < hDS; ++hm) {
         n_ha.h_hivpop(hm, 0, s) +=
