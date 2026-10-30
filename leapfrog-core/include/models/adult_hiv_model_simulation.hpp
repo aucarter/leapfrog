@@ -875,9 +875,16 @@ struct AdultHivModelSimulation<Config> {
 
   // Step 2: within CD4 stage, allocate ART initiations by age proportional to
   // eligibility, capped by the population actually available to initiate
+  //
+  // epp_age_model = 1: the available population includes the step's new
+  // infections, which EPP's age model adds to grad before the ART block
+  // (AgeModel.run_hiv_model); otherwise they are held in grad_infections until
+  // the update. The cap binds only when every eligible person is initiated.
   void allocate_art_initiation_by_age(int s) {
+    const auto& p_ha = pars.ha;
     auto& n_ha = state_next.ha;
     auto& i_ha = intermediate.ha;
+    const bool epp = p_ha.epp_age_model == 1;
 
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
@@ -886,8 +893,8 @@ struct AdultHivModelSimulation<Config> {
                                    i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) /
                                    i_ha.artelig_hm(hm);
           artinit_hahm = std::min(artinit_hahm, i_ha.artelig_hahm(hm, ha - hIDX_15PLUS));
-          artinit_hahm = std::min(artinit_hahm,
-                                  n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s));
+          const real_type grad_in = i_ha.grad(hm, ha, s) + (epp ? i_ha.grad_infections(hm, ha, s) : 0.0);
+          artinit_hahm = std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * grad_in);
           i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
           i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;

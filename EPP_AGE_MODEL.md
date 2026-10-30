@@ -32,8 +32,11 @@ Each row is one behaviour: what EPP does, where in EPP's code, and what leapfrog
 | 7 | Pregnant women's ART eligibility: births | the year's births, before its HIV deaths | births recomputed every time step from `p_totpop`, which loses HIV deaths | `births_by_ha` |
 | 8 | Pregnant women's ART eligibility: HIV-negative women | after the step's infections | before | `pop[t][0]` at the ART step |
 | 9 | ART initiation by CD4 stage | eligibility and expected-mortality shares mixed, allocated once (`art_alloc_method` 3) | Spectrum 6.43: each scheme allocates separately, then averaged | ART block |
+| 10 | ART initiation cap: untreated population available | includes the time step's new infections (added to `grad` before the ART block) | excludes them (held in `grad_infections` until the update) | infections, then ART block |
 
-Rows 1-6 apply only to the `*Entrants` variants (`run_static_entrants`). Rows 7-9 apply to every variant.
+Rows 1-6 apply only to the `*Entrants` variants (`run_static_entrants`). Rows 7-10 apply to every variant. Row 10
+matters only when initiations reach the whole untreated population of a stage: on ZWE Mashonaland East, prior draws
+with very small epidemics, from 2009 when CD4 stage 3 becomes eligible.
 
 ## Inputs EPP uses that are not the DP's
 
