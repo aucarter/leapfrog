@@ -260,6 +260,8 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     base <- if (coarse) "HivCoarseAgeStratification" else "HivFullAgeStratification"
     p <- process_pjnz(pjnz, use_coarse_age_groups = coarse)
     n_years <- dim(p$basepop)[3]
+    ## no special-population or pregnant-women eligibility (this file has none)
+    p[c("specpop_percelig", "pw_artelig", "who34percelig")] <- list(rep(0, n_years), rep(0L, n_years), 0)
     hDS <- dim(p$cd4_mort)[1]; hTS <- dim(p$art_mort)[1]
     entrants <- function(prev, paedsurv = 1, migrants = 0, migrant_hiv_prob = 0) list(
       entrantprev = matrix(prev, 2, n_years),
@@ -304,7 +306,8 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     art <- function(drop) { e <- entrants(0.01); e$entrantartcov[] <- 0.25; e$entrantart_before_start <- as.integer(drop)
       run_model(c(p, e), paste0(base, "Entrants"), years) }
     keep <- art(0); drop <- art(1)
-    expect_equal(drop$p_hivpop[16, , 2], keep$p_hivpop[16, , 2])
+    ## (outside the CD4 pools that share escapes HIV deaths, as in EPP, so the single-age count is higher)
+    expect_true(all(drop$p_hivpop[16, , 2] > keep$p_hivpop[16, , 2]))
     expect_equal(sum(drop$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2]),
                  0.75 * (sum(keep$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2])), tolerance = 1e-3)
   }
