@@ -634,9 +634,17 @@ struct AdultHivModelSimulation<Config> {
           i_ha.expect_mort_artelig15plus += expect_mort;
         }
 
+        real_type onart = 0.0;
         for (int hu = 0; hu < hTS; ++hu) {
-          i_ha.Xart_15plus += n_ha.h_artpop(hu, hm, ha, s) +
-                              opts.dt * i_ha.gradART(hu, hm, ha, s);
+          onart += n_ha.h_artpop(hu, hm, ha, s) + opts.dt * i_ha.gradART(hu, hm, ha, s);
+        }
+        i_ha.Xart_15plus += onart;
+        // EXPERIMENT (AIM manual 6.1.7.6, scheme 2 weights E_h x mu_h with E_h the eligible population including
+        // those on treatment): expected mortality also counts people on ART by CD4 category at initiation
+        if (hm >= i_ha.anyelig_idx) {
+          const real_type expect_mort_art = p_ha.cd4_mortality(hm, ha, s) * onart;
+          i_ha.expect_mort_artelig_hm(hm) += expect_mort_art;
+          i_ha.expect_mort_artelig15plus += expect_mort_art;
         }
       }
 
