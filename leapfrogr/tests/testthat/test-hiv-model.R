@@ -268,7 +268,8 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
       paedsurv_artcd4dist = array(1 / (hTS * hDS), c(hTS, hDS, 2, n_years)),
       paedsurv_lag = rep(paedsurv, n_years),
       cumnetmigr = matrix(migrants, 2, n_years),
-      netmig_hivprob = migrant_hiv_prob)
+      netmig_hivprob = migrant_hiv_prob,
+      entrantart_before_start = 0L)
     years <- 1970:2030
     ref <- run_model(p, base, years)
     zero <- run_model(c(p, entrants(0)), paste0(base, "Entrants"), years)
@@ -298,6 +299,14 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     expect_equal(mig_hiv$p_totpop[16, , 2:15], mig_neg$p_totpop[16, , 2:15])
     late <- which(years == 2025)
     expect_true(all(mig_hiv$p_totpop[16, , late] < mig_neg$p_totpop[16, , late]))
+    ## Entrants on ART before adult ART starts: with entrantart_before_start = 1 (eppasm, EPP) their
+    ## share joins only the single-age HIV+ population, not the untreated CD4 pool
+    art <- function(drop) { e <- entrants(0.01); e$entrantartcov[] <- 0.25; e$entrantart_before_start <- as.integer(drop)
+      run_model(c(p, e), paste0(base, "Entrants"), years) }
+    keep <- art(0); drop <- art(1)
+    expect_equal(drop$p_hivpop[16, , 2], keep$p_hivpop[16, , 2])
+    expect_equal(sum(drop$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2]),
+                 0.75 * (sum(keep$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2])), tolerance = 1e-3)
   }
 })
 
