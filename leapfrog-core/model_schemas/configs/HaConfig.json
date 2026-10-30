@@ -182,6 +182,12 @@
         "r": "art_alloc_mxweight"
       }
     },
+    "initiation_allocation_separate": {
+      "num_type": "int",
+      "alias": {
+        "r": "art_alloc_separate"
+      }
+    },
     "h_art_stage_dur": {
       "num_type": "real_type",
       "dims": ["SS::hTS - 1"]
