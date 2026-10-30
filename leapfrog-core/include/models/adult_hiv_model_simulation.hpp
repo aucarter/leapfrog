@@ -778,22 +778,42 @@ struct AdultHivModelSimulation<Config> {
     const auto& p_ha = pars.ha;
     auto& i_ha = intermediate.ha;
 
+    // A CD4 stage cannot take more initiations than its eligible (untreated) population at the start of the step;
+    // what it cannot take passes to the other stages in proportion to their allocation weights (Spectrum 6.43: with
+    // the expected-mortality weight at 1, untreated adults at CD4 200-500 match only when the overflow is passed on)
+    real_type weight[hDS] = {0.0};
+    bool open[hDS] = {false};
     for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-      real_type eligibility_by_stage = 0.0;
+      real_type w = 0.0;
       if (i_ha.Xartelig_15plus > 0.0) {
-        eligibility_by_stage = (1.0 - p_ha.initiation_mortality_weight) *
-                               i_ha.artelig_hm(hm) /
-                               i_ha.Xartelig_15plus;
+        w += (1.0 - p_ha.initiation_mortality_weight) * i_ha.artelig_hm(hm) / i_ha.Xartelig_15plus;
       }
-
-      real_type expected_mortality_by_stage = 0.0;
       if (i_ha.expect_mort_artelig15plus > 0.0) {
-        expected_mortality_by_stage = p_ha.initiation_mortality_weight *
-                                      i_ha.expect_mort_artelig_hm(hm) /
-                                      i_ha.expect_mort_artelig15plus;
+        w += p_ha.initiation_mortality_weight * i_ha.expect_mort_artelig_hm(hm) / i_ha.expect_mort_artelig15plus;
       }
-
-      i_ha.artinit_hm(hm) = i_ha.artinit_hts * (eligibility_by_stage + expected_mortality_by_stage);
+      weight[hm] = w;
+      open[hm] = i_ha.artelig_hm(hm) > 0.0;
+      i_ha.artinit_hm(hm) = 0.0;
+    }
+    real_type remaining = i_ha.artinit_hts;
+    for (int iter = 0; iter < hDS && remaining > 0.0; ++iter) {
+      real_type wsum = 0.0;
+      for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) if (open[hm]) wsum += weight[hm];
+      if (wsum <= 0.0) break;
+      bool capped = false;
+      for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
+        if (!open[hm]) continue;
+        if (i_ha.artinit_hm(hm) + remaining * weight[hm] / wsum >= i_ha.artelig_hm(hm)) {
+          remaining -= i_ha.artelig_hm(hm) - i_ha.artinit_hm(hm);
+          i_ha.artinit_hm(hm) = i_ha.artelig_hm(hm);
+          open[hm] = false;
+          capped = true;
+        }
+      }
+      if (!capped) {
+        for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) if (open[hm]) i_ha.artinit_hm(hm) += remaining * weight[hm] / wsum;
+        remaining = 0.0;
+      }
     }
   };
 
