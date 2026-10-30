@@ -774,46 +774,50 @@ struct AdultHivModelSimulation<Config> {
 
   // Step 1: allocate ART initiations by CD4 stage, weighting eligibility against
   // expected mortality
-  void allocate_art_initiation_by_cd4() {
-    const auto& p_ha = pars.ha;
+  // Distribute total initiations over CD4 stages by the given weights; a stage cannot take more than its eligible
+  // population at the start of the step, and what it cannot take passes to the others by their weights
+  void fill_cd4_stages(const real_type* weight, real_type total, real_type* alloc) {
     auto& i_ha = intermediate.ha;
-
-    // A CD4 stage cannot take more initiations than its eligible (untreated) population at the start of the step;
-    // what it cannot take passes to the other stages in proportion to their allocation weights (Spectrum 6.43: with
-    // the expected-mortality weight at 1, untreated adults at CD4 200-500 match only when the overflow is passed on)
-    real_type weight[hDS] = {0.0};
     bool open[hDS] = {false};
-    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-      real_type w = 0.0;
-      if (i_ha.Xartelig_15plus > 0.0) {
-        w += (1.0 - p_ha.initiation_mortality_weight) * i_ha.artelig_hm(hm) / i_ha.Xartelig_15plus;
-      }
-      if (i_ha.expect_mort_artelig15plus > 0.0) {
-        w += p_ha.initiation_mortality_weight * i_ha.expect_mort_artelig_hm(hm) / i_ha.expect_mort_artelig15plus;
-      }
-      weight[hm] = w;
-      open[hm] = i_ha.artelig_hm(hm) > 0.0;
-      i_ha.artinit_hm(hm) = 0.0;
-    }
-    real_type remaining = i_ha.artinit_hts;
+    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) { alloc[hm] = 0.0; open[hm] = i_ha.artelig_hm(hm) > 0.0; }
+    real_type remaining = total;
     for (int iter = 0; iter < hDS && remaining > 0.0; ++iter) {
       real_type wsum = 0.0;
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) if (open[hm]) wsum += weight[hm];
       if (wsum <= 0.0) break;
       bool capped = false;
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-        if (!open[hm]) continue;
-        if (i_ha.artinit_hm(hm) + remaining * weight[hm] / wsum >= i_ha.artelig_hm(hm)) {
-          remaining -= i_ha.artelig_hm(hm) - i_ha.artinit_hm(hm);
-          i_ha.artinit_hm(hm) = i_ha.artelig_hm(hm);
+        if (open[hm] && alloc[hm] + remaining * weight[hm] / wsum >= i_ha.artelig_hm(hm)) {
+          remaining -= i_ha.artelig_hm(hm) - alloc[hm];
+          alloc[hm] = i_ha.artelig_hm(hm);
           open[hm] = false;
           capped = true;
         }
       }
       if (!capped) {
-        for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) if (open[hm]) i_ha.artinit_hm(hm) += remaining * weight[hm] / wsum;
+        for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) if (open[hm]) alloc[hm] += remaining * weight[hm] / wsum;
         remaining = 0.0;
       }
+    }
+  }
+
+  // Each scheme (by eligibility, by expected mortality) allocates all initiations on its own, with the stage caps,
+  // and the result is their weighted average (AIM: "the average of two allocation schemes"). Spectrum 6.43 MWI: with
+  // the shares mixed before allocating, untreated women at CD4 < 50 ran to 0.18-0.89 of Spectrum's from 2013; with
+  // the allocations averaged they are within 1% in every year
+  void allocate_art_initiation_by_cd4() {
+    const auto& p_ha = pars.ha;
+    auto& i_ha = intermediate.ha;
+    real_type w_elig[hDS] = {0.0}, w_mort[hDS] = {0.0}, a_elig[hDS] = {0.0}, a_mort[hDS] = {0.0};
+    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
+      w_elig[hm] = i_ha.artelig_hm(hm);
+      w_mort[hm] = i_ha.expect_mort_artelig_hm(hm);
+    }
+    fill_cd4_stages(w_elig, i_ha.artinit_hts, a_elig);
+    fill_cd4_stages(w_mort, i_ha.artinit_hts, a_mort);
+    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
+      i_ha.artinit_hm(hm) = (1.0 - p_ha.initiation_mortality_weight) * a_elig[hm] +
+                            p_ha.initiation_mortality_weight * a_mort[hm];
     }
   };
 
