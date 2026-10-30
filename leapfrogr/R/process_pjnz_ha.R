@@ -281,6 +281,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     art15plus_isperc = art15plus_isperc,
     art_alloc_mxweight = art_alloc_mxweight,
     epp_age_model = 0L,
+    epp_fix_bugs = 0L,
     pAG_INCIDPOP = pAG_INCIDPOP,
     pIDX_INCIDPOP = pIDX_INCIDPOP,
     fert_rat = fert_rat,

@@ -134,6 +134,8 @@ type
     initiationMortalityWeightLength: Integer;
     eppAgeModel: Integer;
     eppAgeModelLength: Integer;
+    eppFixBugs: Integer;
+    eppFixBugsLength: Integer;
     hArtStageDur: PDouble;
     hArtStageDurLength: Integer;
     pagIncidpop: Integer;
@@ -189,6 +191,7 @@ type
     adultsOnArtIsPercent: TGBFixedArray<Integer>;
     initiationMortalityWeight: Double;
     eppAgeModel: Integer;
+    eppFixBugs: Integer;
     hArtStageDur: TGBFixedArray<Double>;
     pagIncidpop: Integer;
     pidxIncidpop: Integer;
@@ -1227,6 +1230,8 @@ begin;
   Result.initiationMortalityWeightLength := 1;
   Result.eppAgeModel := eppAgeModel;
   Result.eppAgeModelLength := 1;
+  Result.eppFixBugs := eppFixBugs;
+  Result.eppFixBugsLength := 1;
   Result.hArtStageDur := PDouble(hArtStageDur.data);
   Result.hArtStageDurLength := hArtStageDur.GetLength();
   Result.pagIncidpop := pagIncidpop;

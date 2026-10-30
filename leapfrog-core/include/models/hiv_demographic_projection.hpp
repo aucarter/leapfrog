@@ -723,9 +723,13 @@ struct HivDemographicProjection<Config> {
       const real_type hivp_entering = surv15 > 0.0 ? hivp_entrants / surv15 : hivp_entrants;
       n_ha.p_deaths_background_hivpop(a0, s) += hivp_entering - hivp_entrants;
 
+      // epp_fix_bugs = 1 corrects EPP here (leapfrogfit docs/EPP_BUGS.md #10):
+      // before adult ART starts the on-ART share joins the untreated pool, so
+      // the CD4-stratified and single-age HIV+ populations stay equal.
       const bool art_started = t > opts.ts_art_start;
       const real_type artcov = p_en.entrant_art_coverage(s, t);
-      const real_type entrants_no_art = hivp_entering * (1.0 - artcov);
+      const real_type entrants_no_art = !art_started && pars.ha.epp_fix_bugs == 1 ?
+        hivp_entering : hivp_entering * (1.0 - artcov);
       const real_type entrants_art = art_started ? hivp_entering * artcov : 0.0;
 
       n_ha.p_hivpop(a0, s) += hivp_entering;
