@@ -658,7 +658,15 @@ struct AdultHivModelSimulation<Config> {
         for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
           births_ha += 0.5 * (c_dp.p_totpop(a, s) + n_dp.p_totpop(a, s)) *
                        p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
-          frr_pop_ha += i_ha.hiv_negative_pop(a, s);
+          // HIV-negative women after this step's infections (EPP moves them
+          // out of pop[t][0] before ART eligibility); hiv_negative_pop is
+          // from before them. Virgin-stratified variants keep their own
+          // at-risk definition.
+          if constexpr (ModelVariant::run_virgin) {
+            frr_pop_ha += i_ha.hiv_negative_pop(a, s);
+          } else {
+            frr_pop_ha += n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s);
+          }
         }
         for (int hm = 0; hm < hDS; ++hm) {
           const real_type frr_cd4 = p_ha.local_adj_factor * p_ha.fert_mult_by_age(hf, t) *
