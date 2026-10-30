@@ -82,6 +82,25 @@ struct AdultHivModelSimulation<Config> {
     for (int tt = 1; tt <= t; ++tt) ever = std::min(ever, anyelig_at(tt));
     i_ha.everARTelig_idx = ever;
 
+    // Births by fertile HIV age group for pregnant women's ART eligibility,
+    // fixed for the year: the female population averaged over the start and
+    // end of the year's demographic projection, before this year's HIV deaths,
+    // times age-specific fertility (EPP's AgeModel.run_hiv_model births_by_ha;
+    // eppasm). Computed here because p_totpop loses HIV deaths every time step.
+    if (p_ha.pw_artelig(t) > 0) {
+      const auto& p_dp = pars.dp;
+      const auto& c_dp = state_curr.dp;
+      const auto& n_dp = state_next.dp;
+      int a = p_idx_hiv_first_adult;
+      for (int hf = 0; hf < hAG_fertility; ++hf) {
+        i_ha.pw_births_by_fertility_age(hf) = 0.0;
+        for (int i = 0; i < hAG_span[hIDX_15PLUS + hf]; ++i, ++a) {
+          i_ha.pw_births_by_fertility_age(hf) += 0.5 * (c_dp.p_totpop(a, FEMALE) + n_dp.p_totpop(a, FEMALE)) *
+            p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
+        }
+      }
+    }
+
     if (p_ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS) {
 
       // Note: In Spectrum, incidence rate by sex is calculated once per year, using
@@ -643,21 +662,17 @@ struct AdultHivModelSimulation<Config> {
       // Pregnant women below the CD4 threshold (e.g. Option B+): in each stage
       // the eligible number is the age group's births times the FRR-weighted
       // HIV+ share of its women, as EPP's age model (AgeModel.run_hiv_model,
-      // pw_artelig) and eppasm. Births use the women averaged over the
-      // previous and current year.
+      // pw_artelig) and eppasm. Births are the year's, from before its HIV
+      // deaths (pw_births_by_fertility_age).
       const int hf = ha - hIDX_15PLUS;
       if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility) {
-        const auto& p_dp = pars.dp;
-        const auto& c_dp = state_curr.dp;
         const auto& n_dp = state_next.dp;
         int a0 = p_idx_hiv_first_adult;
         for (int h = 0; h < ha; ++h) a0 += hAG_span[h];
 
-        real_type births_ha = 0.0;
+        const real_type births_ha = i_ha.pw_births_by_fertility_age(hf);
         real_type frr_pop_ha = 0.0;
         for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
-          births_ha += 0.5 * (c_dp.p_totpop(a, s) + n_dp.p_totpop(a, s)) *
-                       p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
           // HIV-negative women after this step's infections (EPP moves them
           // out of pop[t][0] before ART eligibility); hiv_negative_pop is
           // from before them. Virgin-stratified variants keep their own
