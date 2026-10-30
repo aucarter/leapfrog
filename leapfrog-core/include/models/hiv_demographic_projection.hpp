@@ -78,6 +78,54 @@ struct HivDemographicProjection<Config> {
 
   };
 
+  // Births-weighted HIV prevalence among pregnant women at the end of the year
+  // as EPP's age model computes it (pregprev), kept for 15 years so that this
+  // year's value reaches the age-15 entrants 15 years on. Within each fertile
+  // age group, HIV+ women weighted by their fertility ratios (untreated and on
+  // ART under 6 months: local_adj_factor * fert_mult_by_age * fert_mult_off_art;
+  // on ART longer: local_adj_factor * fert_mult_on_art), averaged over the
+  // year, against the averaged HIV-negative women.
+  void run_static_entrants_pregprev() {
+    const auto& p_ha = pars.ha;
+    const auto& c_dp = state_curr.dp;
+    const auto& n_dp = state_next.dp;
+    const auto& c_ha = state_curr.ha;
+    const auto& n_ha = state_next.ha;
+    const auto& i_en = intermediate.en;
+    const auto& c_en = state_curr.en;
+    auto& n_en = state_next.en;
+
+    real_type births = 0.0;
+    real_type hiv_births = 0.0;
+    int a = p_idx_fertility_first;
+    for (int ha = 0; ha < hAG_fertility; ++ha) {
+      real_type hivn = 0.0;
+      for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
+        hivn += (c_dp.p_totpop(a, FEMALE) - c_ha.p_hivpop(a, FEMALE) +
+                 n_dp.p_totpop(a, FEMALE) - n_ha.p_hivpop(a, FEMALE)) / 2.0;
+      }
+      real_type frr_hivpop = 0.0;
+      for (int hd = 0; hd < hDS; ++hd) {
+        const real_type frr_off_art = p_ha.local_adj_factor * p_ha.fert_mult_by_age(ha, t) * p_ha.fert_mult_off_art(hd);
+        frr_hivpop += frr_off_art * (c_ha.h_hivpop(hd, ha, FEMALE) + n_ha.h_hivpop(hd, ha, FEMALE)) / 2.0;
+        frr_hivpop += frr_off_art * (c_ha.h_artpop(ART0MOS, hd, ha, FEMALE) + n_ha.h_artpop(ART0MOS, hd, ha, FEMALE)) / 2.0;
+        for (int ht = ART0MOS + 1; ht < hTS; ++ht) {
+          frr_hivpop += p_ha.local_adj_factor * p_ha.fert_mult_on_art(ha) *
+            (c_ha.h_artpop(ht, hd, ha, FEMALE) + n_ha.h_artpop(ht, hd, ha, FEMALE)) / 2.0;
+        }
+      }
+      births += i_en.births_by_fertility_age(ha);
+      if (hivn + frr_hivpop > 0.0) {
+        hiv_births += i_en.births_by_fertility_age(ha) * frr_hivpop / (hivn + frr_hivpop);
+      }
+    }
+
+    for (int k = p_idx_hiv_first_adult - 1; k > 0; --k) {
+      n_en.pregprev_lag(k) = c_en.pregprev_lag(k - 1);
+    }
+    n_en.pregprev_lag(0) = births > 0.0 ? hiv_births / births : 0.0;
+  };
+
   void run_hivpop_end_year_migration() {
     auto& n_ha = state_next.ha;
     auto& i_dp = intermediate.dp;
@@ -617,54 +665,6 @@ struct HivDemographicProjection<Config> {
           p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
       }
     }
-  };
-
-  // Births-weighted HIV prevalence among pregnant women at the end of the year
-  // as EPP's age model computes it (pregprev), kept for 15 years so that this
-  // year's value reaches the age-15 entrants 15 years on. Within each fertile
-  // age group, HIV+ women weighted by their fertility ratios (untreated and on
-  // ART under 6 months: local_adj_factor * fert_mult_by_age * fert_mult_off_art;
-  // on ART longer: local_adj_factor * fert_mult_on_art), averaged over the
-  // year, against the averaged HIV-negative women.
-  void run_static_entrants_pregprev() {
-    const auto& p_ha = pars.ha;
-    const auto& c_dp = state_curr.dp;
-    const auto& n_dp = state_next.dp;
-    const auto& c_ha = state_curr.ha;
-    const auto& n_ha = state_next.ha;
-    const auto& i_en = intermediate.en;
-    const auto& c_en = state_curr.en;
-    auto& n_en = state_next.en;
-
-    real_type births = 0.0;
-    real_type hiv_births = 0.0;
-    int a = p_idx_fertility_first;
-    for (int ha = 0; ha < hAG_fertility; ++ha) {
-      real_type hivn = 0.0;
-      for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
-        hivn += (c_dp.p_totpop(a, FEMALE) - c_ha.p_hivpop(a, FEMALE) +
-                 n_dp.p_totpop(a, FEMALE) - n_ha.p_hivpop(a, FEMALE)) / 2.0;
-      }
-      real_type frr_hivpop = 0.0;
-      for (int hd = 0; hd < hDS; ++hd) {
-        const real_type frr_off_art = p_ha.local_adj_factor * p_ha.fert_mult_by_age(ha, t) * p_ha.fert_mult_off_art(hd);
-        frr_hivpop += frr_off_art * (c_ha.h_hivpop(hd, ha, FEMALE) + n_ha.h_hivpop(hd, ha, FEMALE)) / 2.0;
-        frr_hivpop += frr_off_art * (c_ha.h_artpop(ART0MOS, hd, ha, FEMALE) + n_ha.h_artpop(ART0MOS, hd, ha, FEMALE)) / 2.0;
-        for (int ht = ART0MOS + 1; ht < hTS; ++ht) {
-          frr_hivpop += p_ha.local_adj_factor * p_ha.fert_mult_on_art(ha) *
-            (c_ha.h_artpop(ht, hd, ha, FEMALE) + n_ha.h_artpop(ht, hd, ha, FEMALE)) / 2.0;
-        }
-      }
-      births += i_en.births_by_fertility_age(ha);
-      if (hivn + frr_hivpop > 0.0) {
-        hiv_births += i_en.births_by_fertility_age(ha) * frr_hivpop / (hivn + frr_hivpop);
-      }
-    }
-
-    for (int k = p_idx_hiv_first_adult - 1; k > 0; --k) {
-      n_en.pregprev_lag(k) = c_en.pregprev_lag(k - 1);
-    }
-    n_en.pregprev_lag(0) = births > 0.0 ? hiv_births / births : 0.0;
   };
 
   void run_hiv_and_art_stratified_deaths_and_migration() {
