@@ -614,7 +614,11 @@ struct HivDemographicProjection<Config> {
       // values (eppasm: paedsurv_lag[i - 1], cumnetmigr[, i - 1]). With no net
       // migration and paedsurv = 1 the cohort is left as is.
       const real_type paedsurv = p_en.entrant_paediatric_survival(t - 1);
-      const real_type migrants = p_en.entrant_net_migration(s, t - 1);
+      // pop15 has been through this year's survival at 15; so have the
+      // cohort's net migrants within it (EPP's age model and eppasm apply the
+      // age-15 deaths after building the entrants from cumnetmigr)
+      const real_type surv15 = pars.dp.survival_probability(a0, s, t);
+      const real_type migrants = p_en.entrant_net_migration(s, t - 1) * surv15;
       const real_type pregprev_lag = state_curr.en.pregprev_lag(p_idx_hiv_first_adult - 1);
       if (paedsurv > 0.0) {
         n_dp.p_totpop(a0, s) = (pop15 - migrants) * (1.0 - prev15 / paedsurv) +
@@ -651,7 +655,6 @@ struct HivDemographicProjection<Config> {
       // one rate over entrants and residents of the age group, as EPP's age
       // model (entrants, then deathmigrate_ha) and eppasm do. Without this the
       // entrants were survived twice and the residents too little.
-      const real_type surv15 = pars.dp.survival_probability(a0, s, t);
       const real_type hivp_entering = surv15 > 0.0 ? hivp_entrants / surv15 : hivp_entrants;
       n_ha.p_deaths_background_hivpop(a0, s) += hivp_entering - hivp_entrants;
 
