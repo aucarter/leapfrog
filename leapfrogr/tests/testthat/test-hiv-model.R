@@ -289,9 +289,10 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     expect_equal(half$p_hivpop[16, , 2], one$p_hivpop[16, , 2], tolerance = 1e-8)
     ## The cohort's net migrants are HIV-negative except for netmig_hivprob x
     ## pregnant-women prevalence 15 years earlier (eppasm / EPP's age model):
-    ## age 15 total = (pop15 - m) * (1 - prev / paedsurv) + m * (1 - pregprevlag * netmig_hivprob) + pop15 * prev
+    ## age 15 total = (pop15 - m Sx15) * (1 - prev / paedsurv) + m Sx15 * (1 - pregprevlag * netmig_hivprob) + pop15 * prev
+    ## (the migrants are in pop15, which has been through the year's survival at 15)
     mig <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = -1000)), paste0(base, "Entrants"), years)
-    expect_equal(mig$p_totpop[16, , 2] - half$p_totpop[16, , 2], rep(-1000 * 0.01 / 0.5, 2), tolerance = 1e-3)
+    expect_equal(mig$p_totpop[16, , 2] - half$p_totpop[16, , 2], -1000 * 0.01 / 0.5 * unname(p$Sx[16, , 2]), tolerance = 1e-3)
     expect_equal(mig$p_hivpop[16, , 2], half$p_hivpop[16, , 2], tolerance = 1e-8)
     ## Migrants entering with HIV need pregnant-women prevalence from 15 years before: none at first, fewer
     ## HIV-negative entrants once it has reached them
