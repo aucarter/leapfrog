@@ -316,6 +316,11 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     expect_true(all(drop$p_hivpop[16, , 2] > keep$p_hivpop[16, , 2]))
     expect_equal(sum(drop$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2]),
                  0.75 * (sum(keep$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2])), tolerance = 1e-3)
+    ## epp_fix_bugs = 1 corrects EPP: the on-ART share joins the untreated pool before adult ART starts
+    fixed <- { e <- entrants(0.01); e$entrantartcov[] <- 0.25; pp <- p; pp$epp_age_model <- 1L; pp$epp_fix_bugs <- 1L
+      run_model(c(pp, e), paste0(base, "Entrants"), years) }
+    expect_equal(sum(fixed$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2]),
+                 (sum(drop$h_hivpop[, 1, , 2]) - sum(ref$h_hivpop[, 1, , 2])) / 0.75, tolerance = 1e-3)
   }
 })
 
