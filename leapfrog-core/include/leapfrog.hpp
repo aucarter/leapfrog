@@ -183,6 +183,10 @@ struct Leapfrog {
         }
       }
 
+      if constexpr (ModelVariant::run_static_entrants) {
+        hiv_dp.run_static_entrants_pregprev();
+      }
+
       if constexpr (ModelVariant::run_spectrum_model) {
         spectrum.run_spectrum_post_hoc_calulations();
       }

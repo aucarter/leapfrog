@@ -261,12 +261,14 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     p <- process_pjnz(pjnz, use_coarse_age_groups = coarse)
     n_years <- dim(p$basepop)[3]
     hDS <- dim(p$cd4_mort)[1]; hTS <- dim(p$art_mort)[1]
-    entrants <- function(prev, paedsurv = 1) list(
+    entrants <- function(prev, paedsurv = 1, migrants = 0, migrant_hiv_prob = 0) list(
       entrantprev = matrix(prev, 2, n_years),
       entrantartcov = matrix(0, 2, n_years),
       paedsurv_cd4dist = array(1 / hDS, c(hDS, 2, n_years)),
       paedsurv_artcd4dist = array(1 / (hTS * hDS), c(hTS, hDS, 2, n_years)),
-      paedsurv_lag = rep(paedsurv, n_years))
+      paedsurv_lag = rep(paedsurv, n_years),
+      cumnetmigr = matrix(migrants, 2, n_years),
+      netmig_hivprob = migrant_hiv_prob)
     years <- 1970:2030
     ref <- run_model(p, base, years)
     zero <- run_model(c(p, entrants(0)), paste0(base, "Entrants"), years)
@@ -282,6 +284,20 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     expect_equal(half$p_totpop[16, , 2], one$p_totpop[16, , 2] * (1 - 0.01 / 0.5 + 0.01) / (1 - 0.01 + 0.01),
                  tolerance = 1e-4)
     expect_equal(half$p_hivpop[16, , 2], one$p_hivpop[16, , 2], tolerance = 1e-8)
+    ## The cohort's net migrants are HIV-negative except for netmig_hivprob x
+    ## pregnant-women prevalence 15 years earlier (eppasm / EPP's age model):
+    ## age 15 total = (pop15 - m) * (1 - prev / paedsurv) + m * (1 - pregprevlag * netmig_hivprob) + pop15 * prev
+    mig <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = -1000)), paste0(base, "Entrants"), years)
+    expect_equal(mig$p_totpop[16, , 2] - half$p_totpop[16, , 2], rep(-1000 * 0.01 / 0.5, 2), tolerance = 1e-3)
+    expect_equal(mig$p_hivpop[16, , 2], half$p_hivpop[16, , 2], tolerance = 1e-8)
+    ## Migrants entering with HIV need pregnant-women prevalence from 15 years before: none at first, fewer
+    ## HIV-negative entrants once it has reached them
+    mig_hiv <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = 1000, migrant_hiv_prob = 0.5)),
+                         paste0(base, "Entrants"), years)
+    mig_neg <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = 1000)), paste0(base, "Entrants"), years)
+    expect_equal(mig_hiv$p_totpop[16, , 2:15], mig_neg$p_totpop[16, , 2:15])
+    late <- which(years == 2025)
+    expect_true(all(mig_hiv$p_totpop[16, , late] < mig_neg$p_totpop[16, , late]))
   }
 })
 
