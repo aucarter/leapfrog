@@ -662,25 +662,35 @@ struct AdultHivModelSimulation<Config> {
       // Pregnant women below the CD4 threshold (e.g. Option B+): in each stage
       // the eligible number is the age group's births times the FRR-weighted
       // HIV+ share of its women, as EPP's age model (AgeModel.run_hiv_model,
-      // pw_artelig) and eppasm. Births are the year's, from before its HIV
-      // deaths (pw_births_by_fertility_age).
+      // pw_artelig) and eppasm. Births use the women averaged over the
+      // previous and current year.
+      //
+      // epp_age_model = 1, as EPP's age model: births are the year's, from
+      // before its HIV deaths (pw_births_by_fertility_age; p_totpop loses each
+      // step's HIV deaths), and the HIV-negative women are those after this
+      // step's infections (EPP moves them out of pop[t][0] before ART
+      // eligibility; hiv_negative_pop is from before them). Virgin-stratified
+      // variants keep their own at-risk definition.
       const int hf = ha - hIDX_15PLUS;
       if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility) {
+        const auto& p_dp = pars.dp;
+        const auto& c_dp = state_curr.dp;
         const auto& n_dp = state_next.dp;
+        const bool epp = p_ha.epp_age_model == 1;
         int a0 = p_idx_hiv_first_adult;
         for (int h = 0; h < ha; ++h) a0 += hAG_span[h];
 
-        const real_type births_ha = i_ha.pw_births_by_fertility_age(hf);
+        real_type births_ha = epp ? i_ha.pw_births_by_fertility_age(hf) : 0.0;
         real_type frr_pop_ha = 0.0;
         for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
-          // HIV-negative women after this step's infections (EPP moves them
-          // out of pop[t][0] before ART eligibility); hiv_negative_pop is
-          // from before them. Virgin-stratified variants keep their own
-          // at-risk definition.
+          if (!epp) {
+            births_ha += 0.5 * (c_dp.p_totpop(a, s) + n_dp.p_totpop(a, s)) *
+                         p_dp.age_specific_fertility_rate(a - p_idx_fertility_first, t);
+          }
           if constexpr (ModelVariant::run_virgin) {
             frr_pop_ha += i_ha.hiv_negative_pop(a, s);
           } else {
-            frr_pop_ha += n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s);
+            frr_pop_ha += epp ? n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s) : i_ha.hiv_negative_pop(a, s);
           }
         }
         for (int hm = 0; hm < hDS; ++hm) {
@@ -829,13 +839,13 @@ struct AdultHivModelSimulation<Config> {
   // the shares mixed before allocating, untreated women at CD4 < 50 ran to 0.18-0.89 of Spectrum's from 2013; with
   // the allocations averaged they are within 1% in every year
   //
-  // initiation_allocation_separate = 0 mixes the two shares and allocates once, with no stage cap (eppasm, and EPP's
-  // age model: AgeModel.run_hiv_model, art_alloc_method other than 4); the cap then acts per age group in
+  // epp_age_model = 1 mixes the two shares and allocates once, with no stage cap (eppasm, and EPP's age model:
+  // AgeModel.run_hiv_model, art_alloc_method other than 4); the cap then acts per age group in
   // allocate_art_initiation_by_age()
   void allocate_art_initiation_by_cd4() {
     const auto& p_ha = pars.ha;
     auto& i_ha = intermediate.ha;
-    if (p_ha.initiation_allocation_separate != 1) {
+    if (p_ha.epp_age_model == 1) {
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
         real_type eligibility_by_stage = 0.0;
         if (i_ha.Xartelig_15plus > 0.0) {

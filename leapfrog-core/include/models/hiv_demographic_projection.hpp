@@ -584,7 +584,73 @@ struct HivDemographicProjection<Config> {
   // compartments; entrants are added on top, exactly as the child-model path
   // does. p_hivpop is updated in step because the single-age and CD4-stratified
   // adult populations are required to agree.
+  // Static age-15 entrants (variants with run_static_entrants). With
+  // epp_age_model = 0 the HIV+ inflow is pop15 * entrantprev with the
+  // paediatric-survival split below; epp_age_model = 1 builds the entrants as
+  // EPP's age model and eppasm do (run_static_age_15_entrants_epp()).
   void run_static_age_15_entrants() {
+    if (pars.ha.epp_age_model == 1) {
+      run_static_age_15_entrants_epp();
+      return;
+    }
+    static_assert(!ModelVariant::run_child_model,
+                  "run_static_age_15_entrants would double-count entrants when "
+                  "the child model is simulated");
+    const auto& p_en = pars.en;
+    auto& n_dp = state_next.dp;
+    auto& n_ha = state_next.ha;
+    constexpr int a0 = p_idx_hiv_first_adult;
+
+    for (int s = 0; s < NS; ++s) {
+      // The age-15 population comes from the demographic projection, which has
+      // already run for this year without paediatric HIV deaths; only its HIV+
+      // share is supplied here.
+      const real_type pop15 = n_dp.p_totpop(a0, s);
+      const real_type prev15 = p_en.entrant_hiv_prevalence(s, t);
+      const real_type hivp_entrants = pop15 * prev15;
+      if (!(hivp_entrants > 0.0)) {
+        continue;
+      }
+
+      // Children who died of HIV before 15 are missing from the cohort: of the
+      // births that reach 15 HIV+ with probability prev15, a share prev15 /
+      // paedsurv was infected, so the HIV-negative entrants are
+      // pop15 * (1 - prev15 / paedsurv). As eppasm (simmod, no popadjust:
+      // birthslag * cumsurv * (1 - entrantprev / paedsurv_lag)) and EPP's age
+      // model (AgeModel.run_hiv_model). paedsurv = 1 leaves the cohort as is.
+      const real_type paedsurv = p_en.entrant_paediatric_survival(t);
+      if (paedsurv > 0.0 && paedsurv < 1.0) {
+        n_dp.p_totpop(a0, s) = pop15 * (1.0 - prev15 / paedsurv) + hivp_entrants;
+      }
+
+      const bool art_started = t > opts.ts_art_start;
+      const real_type artcov =
+        art_started ? p_en.entrant_art_coverage(s, t) : 0.0;
+      const real_type entrants_no_art = hivp_entrants * (1.0 - artcov);
+      const real_type entrants_art = hivp_entrants * artcov;
+
+      n_ha.p_hivpop(a0, s) += hivp_entrants;
+
+      for (int hm = 0; hm < hDS; ++hm) {
+        n_ha.h_hivpop(hm, 0, s) +=
+          entrants_no_art * p_en.entrant_cd4_distribution(hm, s, t);
+
+        if (entrants_art > 0.0) {
+          for (int hu = 0; hu < hTS; ++hu) {
+            n_ha.h_artpop(hu, hm, 0, s) +=
+              entrants_art * p_en.entrant_art_cd4_distribution(hu, hm, s, t);
+          }
+        }
+      }
+    } // s
+  };
+
+  // epp_age_model = 1: EPP's age model (AgeModel.run_hiv_model) and eppasm
+  // (simmod, no popadjust). The cohort's net migrants are kept apart from
+  // children who died of HIV, births follow the replaced age-15 women, HIV+
+  // entrants survive the year with their age group, and entrants on ART before
+  // adult ART starts join no CD4-stratified pool.
+  void run_static_age_15_entrants_epp() {
     static_assert(!ModelVariant::run_child_model,
                   "run_static_age_15_entrants would double-count entrants when "
                   "the child model is simulated");
@@ -644,11 +710,10 @@ struct HivDemographicProjection<Config> {
       }
 
       // Entrants on ART join the adult ART population from the year after
-      // adult ART starts. Before that, entrant_art_before_art_start = 0 puts
-      // them with the untreated; 1 does as eppasm and EPP's age model
-      // (AgeModel.run_hiv_model): the untreated pool takes only the share off
-      // ART every year and the share on ART enters no CD4-stratified pool
-      // before ART starts, only the single-age HIV+ population.
+      // adult ART starts. Before that, as eppasm and EPP's age model
+      // (AgeModel.run_hiv_model), the untreated pool takes only the share off
+      // ART every year and the share on ART enters no CD4-stratified pool,
+      // only the single-age HIV+ population.
       // pop15 has survived the year at age 15; the HIV+ entrants go into the
       // stratified pools before that, with their non-HIV deaths booked at
       // age 15, so run_hiv_and_art_stratified_deaths_and_migration() applies
@@ -660,9 +725,7 @@ struct HivDemographicProjection<Config> {
 
       const bool art_started = t > opts.ts_art_start;
       const real_type artcov = p_en.entrant_art_coverage(s, t);
-      const bool drop_art = !art_started && p_en.entrant_art_before_art_start == 1;
-      const real_type entrants_no_art =
-        art_started || drop_art ? hivp_entering * (1.0 - artcov) : hivp_entering;
+      const real_type entrants_no_art = hivp_entering * (1.0 - artcov);
       const real_type entrants_art = art_started ? hivp_entering * artcov : 0.0;
 
       n_ha.p_hivpop(a0, s) += hivp_entering;
