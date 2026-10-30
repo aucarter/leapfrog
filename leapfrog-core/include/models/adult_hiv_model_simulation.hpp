@@ -805,9 +805,28 @@ struct AdultHivModelSimulation<Config> {
   // and the result is their weighted average (AIM: "the average of two allocation schemes"). Spectrum 6.43 MWI: with
   // the shares mixed before allocating, untreated women at CD4 < 50 ran to 0.18-0.89 of Spectrum's from 2013; with
   // the allocations averaged they are within 1% in every year
+  //
+  // initiation_allocation_separate = 0 mixes the two shares and allocates once, with no stage cap (eppasm, and EPP's
+  // age model: AgeModel.run_hiv_model, art_alloc_method other than 4); the cap then acts per age group in
+  // allocate_art_initiation_by_age()
   void allocate_art_initiation_by_cd4() {
     const auto& p_ha = pars.ha;
     auto& i_ha = intermediate.ha;
+    if (p_ha.initiation_allocation_separate != 1) {
+      for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
+        real_type eligibility_by_stage = 0.0;
+        if (i_ha.Xartelig_15plus > 0.0) {
+          eligibility_by_stage = (1.0 - p_ha.initiation_mortality_weight) * i_ha.artelig_hm(hm) / i_ha.Xartelig_15plus;
+        }
+        real_type expected_mortality_by_stage = 0.0;
+        if (i_ha.expect_mort_artelig15plus > 0.0) {
+          expected_mortality_by_stage = p_ha.initiation_mortality_weight * i_ha.expect_mort_artelig_hm(hm) /
+                                        i_ha.expect_mort_artelig15plus;
+        }
+        i_ha.artinit_hm(hm) = i_ha.artinit_hts * (eligibility_by_stage + expected_mortality_by_stage);
+      }
+      return;
+    }
     real_type w_elig[hDS] = {0.0}, w_mort[hDS] = {0.0}, a_elig[hDS] = {0.0}, a_mort[hDS] = {0.0};
     for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
       w_elig[hm] = i_ha.artelig_hm(hm);

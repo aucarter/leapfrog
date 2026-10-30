@@ -132,6 +132,8 @@ type
     adultsOnArtIsPercentLength: Integer;
     initiationMortalityWeight: Double;
     initiationMortalityWeightLength: Integer;
+    initiationAllocationSeparate: Integer;
+    initiationAllocationSeparateLength: Integer;
     hArtStageDur: PDouble;
     hArtStageDurLength: Integer;
     pagIncidpop: Integer;
@@ -186,6 +188,7 @@ type
     adultsOnArt: TGBFixedArray<Double>;
     adultsOnArtIsPercent: TGBFixedArray<Integer>;
     initiationMortalityWeight: Double;
+    initiationAllocationSeparate: Integer;
     hArtStageDur: TGBFixedArray<Double>;
     pagIncidpop: Integer;
     pidxIncidpop: Integer;
@@ -1225,6 +1228,8 @@ begin;
   Result.adultsOnArtIsPercentLength := adultsOnArtIsPercent.GetLength();
   Result.initiationMortalityWeight := initiationMortalityWeight;
   Result.initiationMortalityWeightLength := 1;
+  Result.initiationAllocationSeparate := initiationAllocationSeparate;
+  Result.initiationAllocationSeparateLength := 1;
   Result.hArtStageDur := PDouble(hArtStageDur.data);
   Result.hArtStageDurLength := hArtStageDur.GetLength();
   Result.pagIncidpop := pagIncidpop;
