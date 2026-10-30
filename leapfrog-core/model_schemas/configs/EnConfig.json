@@ -41,10 +41,31 @@
       "alias": {
         "r": "paedsurv_lag"
       }
+    },
+    "entrant_net_migration": {
+      "num_type": "real_type",
+      "dims": ["SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "cumnetmigr"
+      }
+    },
+    "entrant_net_migration_hiv_prob": {
+      "num_type": "real_type",
+      "alias": {
+        "r": "netmig_hivprob"
+      }
     }
   },
   "intermediate": {
+    "births_by_fertility_age": {
+      "num_type": "real_type",
+      "dims": ["SS::hAG_fertility"]
+    }
   },
   "state": {
+    "pregprev_lag": {
+      "num_type": "real_type",
+      "dims": ["SS::p_idx_hiv_first_adult"]
+    }
   }
 }

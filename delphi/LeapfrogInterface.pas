@@ -946,6 +946,10 @@ type
     entrantArtCd4DistributionLength: Integer;
     entrantPaediatricSurvival: PDouble;
     entrantPaediatricSurvivalLength: Integer;
+    entrantNetMigration: PDouble;
+    entrantNetMigrationLength: Integer;
+    entrantNetMigrationHivProb: Double;
+    entrantNetMigrationHivProbLength: Integer;
 end;
 
 type
@@ -956,6 +960,8 @@ type
     entrantCd4Distribution: TGBFixedArray<Double>;
     entrantArtCd4Distribution: TGBFixedArray<Double>;
     entrantPaediatricSurvival: TGBFixedArray<Double>;
+    entrantNetMigration: TGBFixedArray<Double>;
+    entrantNetMigrationHivProb: Double;
     function getView(): LeapfrogEntrantsParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -965,11 +971,14 @@ end;
 type
   LeapfrogEntrantsStateView = record
   private
+    pregprevLag: PDouble;
+    pregprevLagLength: Integer;
 end;
 
 type
   LeapfrogEntrantsState = class
   public
+    pregprevLag: TGBFixedArray<Double>;
     function getView(): LeapfrogEntrantsStateView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1874,11 +1883,13 @@ begin;
   entrantCd4Distribution.Free;
   entrantArtCd4Distribution.Free;
   entrantPaediatricSurvival.Free;
+  entrantNetMigration.Free;
   inherited;
 end;
 
 destructor LeapfrogEntrantsState.Destroy;
 begin;
+  pregprevLag.Free;
   inherited;
 end;
 
@@ -1894,10 +1905,16 @@ begin;
   Result.entrantArtCd4DistributionLength := entrantArtCd4Distribution.GetLength();
   Result.entrantPaediatricSurvival := PDouble(entrantPaediatricSurvival.data);
   Result.entrantPaediatricSurvivalLength := entrantPaediatricSurvival.GetLength();
+  Result.entrantNetMigration := PDouble(entrantNetMigration.data);
+  Result.entrantNetMigrationLength := entrantNetMigration.GetLength();
+  Result.entrantNetMigrationHivProb := entrantNetMigrationHivProb;
+  Result.entrantNetMigrationHivProbLength := 1;
 end;
 
 function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;
 begin;
+  Result.pregprevLag := PDouble(pregprevLag.data);
+  Result.pregprevLagLength := pregprevLag.GetLength();
 end;
 
 destructor LeapfrogPopulationAdjustmentParams.Destroy;
@@ -2187,12 +2204,14 @@ begin;
   entrantCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantCd4Distribution');
   entrantArtCd4Distribution.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantArtCd4Distribution');
   entrantPaediatricSurvival.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantPaediatricSurvival');
+  entrantNetMigration.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'entrantNetMigration');
 end;
 
 procedure LeapfrogEntrantsState.writeToDisk(dir: string);
 begin;
   if not DirectoryExists(dir) then
     ForceDirectories(dir);
+  pregprevLag.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'pregprevLag');
 end;
 
 procedure LeapfrogPopulationAdjustmentParams.writeToDisk(dir: string);
