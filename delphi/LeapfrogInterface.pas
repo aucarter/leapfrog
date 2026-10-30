@@ -950,6 +950,8 @@ type
     entrantNetMigrationLength: Integer;
     entrantNetMigrationHivProb: Double;
     entrantNetMigrationHivProbLength: Integer;
+    entrantArtBeforeArtStart: Integer;
+    entrantArtBeforeArtStartLength: Integer;
 end;
 
 type
@@ -962,6 +964,7 @@ type
     entrantPaediatricSurvival: TGBFixedArray<Double>;
     entrantNetMigration: TGBFixedArray<Double>;
     entrantNetMigrationHivProb: Double;
+    entrantArtBeforeArtStart: Integer;
     function getView(): LeapfrogEntrantsParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1909,6 +1912,8 @@ begin;
   Result.entrantNetMigrationLength := entrantNetMigration.GetLength();
   Result.entrantNetMigrationHivProb := entrantNetMigrationHivProb;
   Result.entrantNetMigrationHivProbLength := 1;
+  Result.entrantArtBeforeArtStart := entrantArtBeforeArtStart;
+  Result.entrantArtBeforeArtStartLength := 1;
 end;
 
 function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;

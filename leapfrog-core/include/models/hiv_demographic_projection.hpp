@@ -625,11 +625,18 @@ struct HivDemographicProjection<Config> {
         continue;
       }
 
+      // Entrants on ART join the adult ART population from the year after
+      // adult ART starts. Before that, entrant_art_before_art_start = 0 puts
+      // them with the untreated; 1 does as eppasm and EPP's age model
+      // (AgeModel.run_hiv_model): the untreated pool takes only the share off
+      // ART every year and the share on ART enters no CD4-stratified pool
+      // before ART starts, only the single-age HIV+ population.
       const bool art_started = t > opts.ts_art_start;
-      const real_type artcov =
-        art_started ? p_en.entrant_art_coverage(s, t) : 0.0;
-      const real_type entrants_no_art = hivp_entrants * (1.0 - artcov);
-      const real_type entrants_art = hivp_entrants * artcov;
+      const real_type artcov = p_en.entrant_art_coverage(s, t);
+      const bool drop_art = !art_started && p_en.entrant_art_before_art_start == 1;
+      const real_type entrants_no_art =
+        art_started || drop_art ? hivp_entrants * (1.0 - artcov) : hivp_entrants;
+      const real_type entrants_art = art_started ? hivp_entrants * artcov : 0.0;
 
       n_ha.p_hivpop(a0, s) += hivp_entrants;
 

@@ -54,6 +54,12 @@
       "alias": {
         "r": "netmig_hivprob"
       }
+    },
+    "entrant_art_before_art_start": {
+      "num_type": "int",
+      "alias": {
+        "r": "entrantart_before_start"
+      }
     }
   },
   "intermediate": {
