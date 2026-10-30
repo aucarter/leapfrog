@@ -10,6 +10,13 @@ whether leapfrog behaves as the age model inside EPP 2025_R1 (`AgeModel.run_hiv_
 Branch `feature/epp-age-model` on aucarter/leapfrog. It sits on `fix/epp-entrant-migrants` (11 commits), which is on
 `11edfa44`, 29 commits on top of hivtools `main` `e42e108c`.
 
+## Correcting EPP's bugs: `epp_fix_bugs`
+
+A second parameter, `epp_fix_bugs` (default 0), keeps `epp_age_model = 1` but corrects EPP's one engine-side bug:
+entrants on paediatric ART before adult ART starts (row 6 below) join the untreated pool instead of leaving the
+CD4-stratified population. EPP's other bugs are in its inputs and its sampler; leapfrogfit corrects them
+(`epp_bug_fixes`, `docs/EPP_BUGS.md`), so EPP, EPP with its bugs fixed, and leapfrog's own model can be compared.
+
 ## What the switch changes
 
 Each row is one behaviour: what EPP does, where in EPP's code, and what leapfrog does with 0.
