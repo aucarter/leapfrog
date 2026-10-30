@@ -182,10 +182,10 @@
         "r": "art_alloc_mxweight"
       }
     },
-    "initiation_allocation_separate": {
+    "epp_age_model": {
       "num_type": "int",
       "alias": {
-        "r": "art_alloc_separate"
+        "r": "epp_age_model"
       }
     },
     "h_art_stage_dur": {

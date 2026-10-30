@@ -270,8 +270,7 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
       paedsurv_artcd4dist = array(1 / (hTS * hDS), c(hTS, hDS, 2, n_years)),
       paedsurv_lag = rep(paedsurv, n_years),
       cumnetmigr = matrix(migrants, 2, n_years),
-      netmig_hivprob = migrant_hiv_prob,
-      entrantart_before_start = 0L)
+      netmig_hivprob = migrant_hiv_prob)
     years <- 1970:2030
     ref <- run_model(p, base, years)
     zero <- run_model(c(p, entrants(0)), paste0(base, "Entrants"), years)
@@ -283,6 +282,9 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     ## Paediatric survival below 1 removes children who died of HIV from the
     ## HIV-negative entrants: age 15 total = pop15 * (1 - prev / paedsurv + prev)
     half <- run_model(c(p, entrants(0.01, paedsurv = 0.5)), paste0(base, "Entrants"), years)
+    ## epp_age_model = 1 (EPP's age model / eppasm entrants) from here on
+    pe <- p; pe$epp_age_model <- 1L
+    half_epp <- run_model(c(pe, entrants(0.01, paedsurv = 0.5)), paste0(base, "Entrants"), years)
     ## (to 1e-4: the smaller HIV-negative cohort also has slightly fewer infections and deaths in the year)
     expect_equal(half$p_totpop[16, , 2], one$p_totpop[16, , 2] * (1 - 0.01 / 0.5 + 0.01) / (1 - 0.01 + 0.01),
                  tolerance = 1e-4)
@@ -291,21 +293,24 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     ## pregnant-women prevalence 15 years earlier (eppasm / EPP's age model):
     ## age 15 total = (pop15 - m Sx15) * (1 - prev / paedsurv) + m Sx15 * (1 - pregprevlag * netmig_hivprob) + pop15 * prev
     ## (the migrants are in pop15, which has been through the year's survival at 15)
-    mig <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = -1000)), paste0(base, "Entrants"), years)
-    expect_equal(mig$p_totpop[16, , 2] - half$p_totpop[16, , 2], -1000 * 0.01 / 0.5 * unname(p$Sx[16, , 2]), tolerance = 1e-3)
-    expect_equal(mig$p_hivpop[16, , 2], half$p_hivpop[16, , 2], tolerance = 1e-8)
+    mig <- run_model(c(pe, entrants(0.01, paedsurv = 0.5, migrants = -1000)), paste0(base, "Entrants"), years)
+    expect_equal(mig$p_totpop[16, , 2] - half_epp$p_totpop[16, , 2], -1000 * 0.01 / 0.5 * unname(p$Sx[16, , 2]), tolerance = 1e-3)
+    expect_equal(mig$p_hivpop[16, , 2], half_epp$p_hivpop[16, , 2], tolerance = 1e-8)
+    ## with epp_age_model = 0 the cohort's net migrants are ignored, as before
+    mig0 <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = -1000)), paste0(base, "Entrants"), years)
+    expect_equal(mig0$p_totpop, half$p_totpop)
     ## Migrants entering with HIV need pregnant-women prevalence from 15 years before: none at first, fewer
     ## HIV-negative entrants once it has reached them
-    mig_hiv <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = 1000, migrant_hiv_prob = 0.5)),
+    mig_hiv <- run_model(c(pe, entrants(0.01, paedsurv = 0.5, migrants = 1000, migrant_hiv_prob = 0.5)),
                          paste0(base, "Entrants"), years)
-    mig_neg <- run_model(c(p, entrants(0.01, paedsurv = 0.5, migrants = 1000)), paste0(base, "Entrants"), years)
+    mig_neg <- run_model(c(pe, entrants(0.01, paedsurv = 0.5, migrants = 1000)), paste0(base, "Entrants"), years)
     expect_equal(mig_hiv$p_totpop[16, , 2:15], mig_neg$p_totpop[16, , 2:15])
     late <- which(years == 2025)
     expect_true(all(mig_hiv$p_totpop[16, , late] < mig_neg$p_totpop[16, , late]))
-    ## Entrants on ART before adult ART starts: with entrantart_before_start = 1 (eppasm, EPP) their
+    ## Entrants on ART before adult ART starts: with epp_age_model = 1 (eppasm, EPP) their
     ## share joins only the single-age HIV+ population, not the untreated CD4 pool
-    art <- function(drop) { e <- entrants(0.01); e$entrantartcov[] <- 0.25; e$entrantart_before_start <- as.integer(drop)
-      run_model(c(p, e), paste0(base, "Entrants"), years) }
+    art <- function(drop) { e <- entrants(0.01); e$entrantartcov[] <- 0.25; pp <- p; pp$epp_age_model <- as.integer(drop)
+      run_model(c(pp, e), paste0(base, "Entrants"), years) }
     keep <- art(0); drop <- art(1)
     ## (outside the CD4 pools that share escapes HIV deaths, as in EPP, so the single-age count is higher)
     expect_true(all(drop$p_hivpop[16, , 2] > keep$p_hivpop[16, , 2]))

@@ -132,8 +132,8 @@ type
     adultsOnArtIsPercentLength: Integer;
     initiationMortalityWeight: Double;
     initiationMortalityWeightLength: Integer;
-    initiationAllocationSeparate: Integer;
-    initiationAllocationSeparateLength: Integer;
+    eppAgeModel: Integer;
+    eppAgeModelLength: Integer;
     hArtStageDur: PDouble;
     hArtStageDurLength: Integer;
     pagIncidpop: Integer;
@@ -188,7 +188,7 @@ type
     adultsOnArt: TGBFixedArray<Double>;
     adultsOnArtIsPercent: TGBFixedArray<Integer>;
     initiationMortalityWeight: Double;
-    initiationAllocationSeparate: Integer;
+    eppAgeModel: Integer;
     hArtStageDur: TGBFixedArray<Double>;
     pagIncidpop: Integer;
     pidxIncidpop: Integer;
@@ -953,8 +953,6 @@ type
     entrantNetMigrationLength: Integer;
     entrantNetMigrationHivProb: Double;
     entrantNetMigrationHivProbLength: Integer;
-    entrantArtBeforeArtStart: Integer;
-    entrantArtBeforeArtStartLength: Integer;
 end;
 
 type
@@ -967,7 +965,6 @@ type
     entrantPaediatricSurvival: TGBFixedArray<Double>;
     entrantNetMigration: TGBFixedArray<Double>;
     entrantNetMigrationHivProb: Double;
-    entrantArtBeforeArtStart: Integer;
     function getView(): LeapfrogEntrantsParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1228,8 +1225,8 @@ begin;
   Result.adultsOnArtIsPercentLength := adultsOnArtIsPercent.GetLength();
   Result.initiationMortalityWeight := initiationMortalityWeight;
   Result.initiationMortalityWeightLength := 1;
-  Result.initiationAllocationSeparate := initiationAllocationSeparate;
-  Result.initiationAllocationSeparateLength := 1;
+  Result.eppAgeModel := eppAgeModel;
+  Result.eppAgeModelLength := 1;
   Result.hArtStageDur := PDouble(hArtStageDur.data);
   Result.hArtStageDurLength := hArtStageDur.GetLength();
   Result.pagIncidpop := pagIncidpop;
@@ -1917,8 +1914,6 @@ begin;
   Result.entrantNetMigrationLength := entrantNetMigration.GetLength();
   Result.entrantNetMigrationHivProb := entrantNetMigrationHivProb;
   Result.entrantNetMigrationHivProbLength := 1;
-  Result.entrantArtBeforeArtStart := entrantArtBeforeArtStart;
-  Result.entrantArtBeforeArtStartLength := 1;
 end;
 
 function LeapfrogEntrantsState.getView(): LeapfrogEntrantsStateView;
