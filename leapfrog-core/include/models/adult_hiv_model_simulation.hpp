@@ -132,7 +132,9 @@ struct AdultHivModelSimulation<Config> {
     } else {
 
       if (p_ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS) {
-        calc_new_infections_agesex();
+        // csavr_dll_model = 1: the year's infections are added once, after
+        // the time steps (run_hiv_adult_post_hiv_loop)
+        if (p_ha.csavr_dll_model != 1) calc_new_infections_agesex();
       } else if (p_ha.incidence_model_choice == SS::INCIDMOD_TRANSMRATE_HTS){
         calc_new_infections_incidmod_transmrate(hiv_step);
       } else {
@@ -140,7 +142,9 @@ struct AdultHivModelSimulation<Config> {
       }
     }
 
-    add_new_hiv_infections();
+    if (!(p_ha.csavr_dll_model == 1 && p_ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS)) {
+      add_new_hiv_infections();
+    }
 
     if (t >= opts.ts_art_start) {
       run_art_progression_and_mortality();
@@ -174,6 +178,51 @@ struct AdultHivModelSimulation<Config> {
       }
     }
 
+  };
+
+  // csavr_dll_model = 1: Spectrum's CSAVR engine (eppcsavri686.dll, as eppasm's
+  // annual direct incidence, EPP_DIRECTINCID_ANN) adds the year's infections
+  // once, after the time steps, so they neither progress nor die that year. The
+  // age distribution weights last year's HIV-negative population at each single
+  // age; the rate is clamped to [0, 1] and infections are capped at this year's
+  // HIV-negative population (CSAVR_VARIANT.md, row 0).
+  void run_hiv_adult_post_hiv_loop() {
+    const auto& p_ha = pars.ha;
+    if (p_ha.csavr_dll_model != 1 || p_ha.incidence_model_choice != SS::INCIDMOD_DIRECTINCID_HTS) return;
+    const auto& c_dp = state_curr.dp;
+    const auto& c_ha = state_curr.ha;
+    const auto& n_dp = state_next.dp;
+    auto& n_ha = state_next.ha;
+    const auto& i_ha = intermediate.ha;
+
+    for (int s = 0; s < NS; ++s) {
+      real_type Xhivn_incagerr = 0.0;
+      for (int a = p_ha.pIDX_INCIDPOP; a < p_ha.pIDX_INCIDPOP + p_ha.pAG_INCIDPOP; ++a) {
+        Xhivn_incagerr += p_ha.incidence_rate_ratio_age(a - p_idx_hiv_first_adult, s, t) *
+                          (c_dp.p_totpop(a, s) - c_ha.p_hivpop(a, s));
+      }
+
+      int a = p_idx_hiv_first_adult;
+      for (int ha = 0; ha < hAG; ++ha) {
+        real_type infections_ha = 0.0;
+        for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
+          real_type pr = i_ha.incidence_rate_sex(s) *
+                         p_ha.incidence_rate_ratio_age(a - p_idx_hiv_first_adult, s, t) *
+                         i_ha.hiv_neg_aggregate(s) / Xhivn_incagerr;
+          if (pr < 0.0) pr = 0.0;
+          if (pr > 1.0) pr = 1.0;
+          real_type infections_a = pr * (c_dp.p_totpop(a, s) - c_ha.p_hivpop(a, s));
+          const real_type hivn_now = n_dp.p_totpop(a, s) - n_ha.p_hivpop(a, s);
+          if (infections_a > hivn_now) infections_a = hivn_now;
+          infections_ha += infections_a;
+          n_ha.p_infections(a, s) += infections_a;
+          n_ha.p_hivpop(a, s) += infections_a;
+        }
+        for (int hm = 0; hm < hDS; ++hm) {
+          n_ha.h_hivpop(hm, ha, s) += infections_ha * p_ha.cd4_initial_distribution(hm, ha, s);
+        }
+      }
+    }
   };
 
   // private methods that we don't want people to call

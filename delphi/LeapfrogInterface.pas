@@ -136,6 +136,8 @@ type
     eppAgeModelLength: Integer;
     eppFixBugs: Integer;
     eppFixBugsLength: Integer;
+    csavrDllModel: Integer;
+    csavrDllModelLength: Integer;
     hArtStageDur: PDouble;
     hArtStageDurLength: Integer;
     pagIncidpop: Integer;
@@ -192,6 +194,7 @@ type
     initiationMortalityWeight: Double;
     eppAgeModel: Integer;
     eppFixBugs: Integer;
+    csavrDllModel: Integer;
     hArtStageDur: TGBFixedArray<Double>;
     pagIncidpop: Integer;
     pidxIncidpop: Integer;
@@ -1232,6 +1235,8 @@ begin;
   Result.eppAgeModelLength := 1;
   Result.eppFixBugs := eppFixBugs;
   Result.eppFixBugsLength := 1;
+  Result.csavrDllModel := csavrDllModel;
+  Result.csavrDllModelLength := 1;
   Result.hArtStageDur := PDouble(hArtStageDur.data);
   Result.hArtStageDurLength := hArtStageDur.GetLength();
   Result.pagIncidpop := pagIncidpop;

@@ -194,6 +194,12 @@
         "r": "epp_fix_bugs"
       }
     },
+    "csavr_dll_model": {
+      "num_type": "int",
+      "alias": {
+        "r": "csavr_dll_model"
+      }
+    },
     "h_art_stage_dur": {
       "num_type": "real_type",
       "dims": ["SS::hTS - 1"]
