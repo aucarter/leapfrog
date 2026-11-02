@@ -173,6 +173,9 @@ struct Leapfrog {
           hiv_dp.run_hivpop_end_year_migration();
         }
       }
+      if constexpr (ModelVariant::run_hiv_simulation) {
+        hiv_dp.run_csavr_diag_bound();
+      }
       if constexpr (ModelVariant::run_child_model) {
         hiv_dp.run_hc_hivpop_end_year_migration();
       }

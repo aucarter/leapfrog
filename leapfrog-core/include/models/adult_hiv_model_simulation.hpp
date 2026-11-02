@@ -146,6 +146,8 @@ struct AdultHivModelSimulation<Config> {
       add_new_hiv_infections();
     }
 
+    if (p_ha.csavr_dll_model == 1 && t >= p_ha.diag_start) run_csavr_diagnoses();
+
     if (t >= opts.ts_art_start) {
       run_art_progression_and_mortality();
       if (p_ha.csavr_dll_model == 1) run_csavr_step_order();
@@ -671,14 +673,35 @@ struct AdultHivModelSimulation<Config> {
             for (int hu = 0; hu < hTS; ++hu) {
               const real_type d = opts.dt * p_ha.dropout_rate(t) * n_ha.h_artpop(hu, hm, ha, s);
               n_ha.h_artpop(hu, hm, ha, s) -= d;
-              if (p_ha.dropout_recover_cd4 && hu >= 2 && hm >= 1) {
-                n_ha.h_hivpop(hm - 1, ha, s) += d;
-              } else {
-                n_ha.h_hivpop(hm, ha, s) += d;
-              }
+              const int hm_to = (p_ha.dropout_recover_cd4 && hu >= 2 && hm >= 1) ? hm - 1 : hm;
+              n_ha.h_hivpop(hm_to, ha, s) += d;
+              if (t >= p_ha.diag_start) n_ha.h_diagpop(hm_to, ha, s) += d;
             }
           }
         }
+      }
+    }
+  };
+
+  // csavr_dll_model = 1: each time step, from the year diagnosis starts and
+  // before the ART block, the undiagnosed among the untreated are diagnosed at
+  // diag_rate, and the diagnosed stock progresses and dies with the untreated
+  // CD4 rates (mortality unscaled by ART coverage), from start-of-step stocks
+  void run_csavr_diagnoses() {
+    const auto& p_ha = pars.ha;
+    auto& n_ha = state_next.ha;
+    for (int s = 0; s < NS; ++s) {
+      for (int ha = 0; ha < hAG; ++ha) {
+        real_type gd[hDS];
+        for (int hm = 0; hm < hDS; ++hm) {
+          gd[hm] = p_ha.diag_rate(hm, ha, s, t) * (n_ha.h_hivpop(hm, ha, s) - n_ha.h_diagpop(hm, ha, s)) -
+                   (p_ha.cd4_mortality(hm, ha, s) + p_ha.cd4_nonaids_excess_mort(hm, ha, s)) * n_ha.h_diagpop(hm, ha, s);
+        }
+        for (int hm = 0; hm < hDS - 1; ++hm) {
+          gd[hm] -= p_ha.cd4_progression(hm, ha, s) * n_ha.h_diagpop(hm, ha, s);
+          gd[hm + 1] += p_ha.cd4_progression(hm, ha, s) * n_ha.h_diagpop(hm, ha, s);
+        }
+        for (int hm = 0; hm < hDS; ++hm) n_ha.h_diagpop(hm, ha, s) += opts.dt * gd[hm];
       }
     }
   };
@@ -985,7 +1008,9 @@ struct AdultHivModelSimulation<Config> {
     // (1 - w) / eligible), with the same caps
     const bool cell = p_ha.csavr_dll_model == 1;
 
+    const bool diag = cell && t >= p_ha.diag_start;
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
+      real_type diag_excess = 0.0;
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
         if (cell && i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) > 0.0) {
           const real_type el = i_ha.artelig_hahm(hm, ha - hIDX_15PLUS);
@@ -999,6 +1024,16 @@ struct AdultHivModelSimulation<Config> {
           i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
           i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
+          // csavr_dll_model = 1: initiations come from the diagnosed first; any
+          // excess is taken from the age group's remaining diagnosed, pro rata
+          if (diag) {
+            if (n_ha.h_diagpop(hm, ha, s) >= artinit_hahm) {
+              n_ha.h_diagpop(hm, ha, s) -= artinit_hahm;
+            } else {
+              diag_excess += artinit_hahm - n_ha.h_diagpop(hm, ha, s);
+              n_ha.h_diagpop(hm, ha, s) = 0.0;
+            }
+          }
         } else if (!cell && i_ha.artelig_hm(hm) > 0.0) {
           real_type artinit_hahm = i_ha.artinit_hm(hm) *
                                    i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) /
@@ -1010,6 +1045,12 @@ struct AdultHivModelSimulation<Config> {
           i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
         }
+      }
+      if (diag && diag_excess > 0.0) {
+        real_type dsum = 0.0;
+        for (int hm = 0; hm < hDS; ++hm) dsum += n_ha.h_diagpop(hm, ha, s);
+        const real_type fr = diag_excess < dsum ? diag_excess / dsum : 1.0;
+        for (int hm = 0; hm < hDS; ++hm) n_ha.h_diagpop(hm, ha, s) -= n_ha.h_diagpop(hm, ha, s) * fr;
       }
     }
   };
