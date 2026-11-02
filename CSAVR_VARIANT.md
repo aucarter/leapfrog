@@ -26,6 +26,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 3 | Order within a time step | untreated update (with the step's new infections under transmission-rate incidence), then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
 | 4 | HIV+ migrants | in a year where the input (`hivmigr`, [8 groups 15-19 ... 45-49, 50+, sex, year]) is non-zero anywhere, it replaces net migration x HIV+ population at ages 15+, spread evenly over each group's single ages (15-19 for the 15-16 and 17-19 groups); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
 | 5 | Diagnosis | diagnosed stock `h_diagpop` [CD4, age group, sex], from year index `diag_start`, rates `diag_rate` [CD4, age group, sex, year] as input: ages with the untreated stock (nobody enters at 15); background deaths and migration at the group's rates, migration applied twice after the start year (with the HIV+ migrant input it gains untreated x rate first); each time step before ART, diagnosis of the undiagnosed and the untreated CD4 progression and unscaled mortality; dropouts return to it; initiations come from it, with any excess taken from the age group's diagnosed pro rata; held within [0, untreated + on ART] at year end | none | done |
+| 6 | PWID excess mortality | not applied: the DLL's projection has no PWID input (its only IDU terms are likelihoods, `llik_IDUBothSexes`) and its background deaths take one survival-based rate per age group | applied to HIV+ ages 15-49 under transmission-rate incidence when `pwid_sex_ratio` >= 0 | done |
 
 Inputs, not engine (set by the caller):
 - ART dropout is the annual proportion the DLL applies.
@@ -66,5 +67,8 @@ Callers that build parameters without it must add both.
 - **Row 5.** PAN, families 1-3, 5, 6, with the oracle's diagnosis rates (`l2_diag_rates` from the base run's ART
   coverage and Spectrum's stored diagnosis parameters): diagnosed total within 1.6e-14, reported new diagnoses within
   6.7e-16, largest absolute difference in any diagnosed cell 5.9e-13 persons.
+- **Row 6.** Family 4 (r-logistic) on KGZ, ARM, MEX and URY, whose DPs set the PWID inputs: with the adjustment, the
+  HIV+ stock went negative in KGZ's 1978 (an epidemic of about 10 people); without it, totals within 5e-15 and
+  diagnosed cells within 7e-12 persons. The other 31 files were already exact for family 4.
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
