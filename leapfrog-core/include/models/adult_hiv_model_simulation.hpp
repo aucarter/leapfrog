@@ -796,7 +796,10 @@ struct AdultHivModelSimulation<Config> {
 
     real_type art_interp_w = opts.dt * (hiv_step + 1.0);
     real_type artnum_hts = 0.0;
-    if (opts.proj_period_int == PROJPERIOD_MIDYEAR && art_interp_w < 0.5) {
+    // csavr_dll_model = 1: the CSAVR DLL interpolates ART targets as for a
+    // mid-year projection whatever the projection period
+    const bool art_midyear = opts.proj_period_int == PROJPERIOD_MIDYEAR || p_ha.csavr_dll_model == 1;
+    if (art_midyear && art_interp_w < 0.5) {
       if (!p_ha.adults_on_art_is_percent(s, t - 2) && !p_ha.adults_on_art_is_percent(s, t - 1)) {
         // case: both values are numbers
         artnum_hts = (0.5 - art_interp_w) * p_ha.adults_on_art(s, t - 2) +
@@ -825,7 +828,7 @@ struct AdultHivModelSimulation<Config> {
       // calendar year (e.g. hts 7/10 for 2019 interpolates December 2018
       // to December 2019)
 
-      if (opts.proj_period_int == PROJPERIOD_MIDYEAR) {
+      if (art_midyear) {
         art_interp_w -= 0.5;
       }
 
