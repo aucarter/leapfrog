@@ -43,7 +43,7 @@ Inputs, not engine (set by the caller):
 
 New required parameters: `csavr_dll_model` (int), `hivmigr` ([8, 2, years]), `diag_start` (int, 0-based year index)
 and `diag_rate` ([hDS, hAG, 2, years]); `process_pjnz()` sets 0, zeros, the projection length (never) and zeros.
-Callers that build parameters without it must add both.
+Callers that build parameters without `process_pjnz()` must add all four.
 
 ## Evidence
 
@@ -70,5 +70,10 @@ Callers that build parameters without it must add both.
 - **Row 6.** Family 4 (r-logistic) on KGZ, ARM, MEX and URY, whose DPs set the PWID inputs: with the adjustment, the
   HIV+ stock went negative in KGZ's 1978 (an epidemic of about 10 people); without it, totals within 5e-15 and
   diagnosed cells within 7e-12 persons. The other 31 files were already exact for family 4.
+- **All rows, all files.** 35 CSAVR-fit 2026 files x all six families (Slurm array 477405; leapfrogfit
+  `scratch/lf_cmp_task6.R`, results under `/share/hiv/unaids_reproduction/2026/csavr/scorecard/20261102_lfvariant_l6_v1/`),
+  with the oracle's diagnosis rates: PLHIV, deaths, infections, on-ART and total population within 1e-14; reported
+  new diagnoses within 4.2e-14; largest absolute difference in any diagnosed cell 7.1e-12 persons; worst age x sex x
+  year PLHIV cell 1.9e-13 relative, in an ALB cell holding 0.0016 persons (about 3e-16 persons: double precision).
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
