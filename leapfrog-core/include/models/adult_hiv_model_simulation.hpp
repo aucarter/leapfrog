@@ -148,6 +148,7 @@ struct AdultHivModelSimulation<Config> {
 
     if (t >= opts.ts_art_start) {
       run_art_progression_and_mortality();
+      if (p_ha.csavr_dll_model == 1) run_csavr_step_order();
       run_h_art_initiation(hiv_step);
 
       if constexpr (ModelVariant::run_virgin) {
@@ -607,8 +608,9 @@ struct AdultHivModelSimulation<Config> {
             i_ha.gradART(hu + 1, hm, ha, s) += art_adults_progressing_treatment_stage;
           }
 
-          // ART dropout
-          if (p_ha.dropout_rate(t) > 0) {
+          // ART dropout (csavr_dll_model = 1: taken later, from the updated
+          // ART stock, in run_csavr_step_order)
+          if (p_ha.dropout_rate(t) > 0 && p_ha.csavr_dll_model != 1) {
             for (int hu = 0; hu < hTS; ++hu) {
 
               real_type temp_art_adult_dropout = 0.0;
@@ -634,6 +636,47 @@ struct AdultHivModelSimulation<Config> {
                 i_ha.grad(hm, ha, s) += art_adult_dropout;
               }
               i_ha.gradART(hu, hm, ha, s) -= art_adult_dropout;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // csavr_dll_model = 1: the CSAVR DLL's order within a time step. The untreated
+  // progression and mortality and the ART mortality and duration flows are
+  // applied to the stocks first; dropout is then taken from the updated ART
+  // stock straight into the untreated population (one CD4 stage up after a
+  // year on ART when dropout_recover_cd4), and only then are initiations
+  // allocated. The end-of-step updates apply the initiations alone
+  // (CSAVR_VARIANT.md, row 3).
+  void run_csavr_step_order() {
+    const auto& p_ha = pars.ha;
+    auto& n_ha = state_next.ha;
+    auto& i_ha = intermediate.ha;
+
+    for (int s = 0; s < NS; ++s) {
+      for (int ha = 0; ha < hAG; ++ha) {
+        for (int hm = 0; hm < hDS; ++hm) {
+          n_ha.h_hivpop(hm, ha, s) += opts.dt * i_ha.grad(hm, ha, s);
+          i_ha.grad(hm, ha, s) = 0.0;
+        }
+        for (int hm = i_ha.everARTelig_idx; hm < hDS; ++hm) {
+          for (int hu = 0; hu < hTS; ++hu) {
+            n_ha.h_artpop(hu, hm, ha, s) += opts.dt * i_ha.gradART(hu, hm, ha, s);
+            i_ha.gradART(hu, hm, ha, s) = 0.0;
+          }
+        }
+        if (p_ha.dropout_rate(t) > 0) {
+          for (int hm = i_ha.everARTelig_idx; hm < hDS; ++hm) {
+            for (int hu = 0; hu < hTS; ++hu) {
+              const real_type d = opts.dt * p_ha.dropout_rate(t) * n_ha.h_artpop(hu, hm, ha, s);
+              n_ha.h_artpop(hu, hm, ha, s) -= d;
+              if (p_ha.dropout_recover_cd4 && hu >= 2 && hm >= 1) {
+                n_ha.h_hivpop(hm - 1, ha, s) += d;
+              } else {
+                n_ha.h_hivpop(hm, ha, s) += d;
+              }
             }
           }
         }

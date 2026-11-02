@@ -21,7 +21,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 0 | New infections | added once per year, after the time steps (eppasm `EPP_DIRECTINCID_ANN`); age distribution weights last year's HIV-negative population at each single age, rate clamped to [0, 1], capped at this year's HIV-negative population | spread over the time steps, weighted by the current population | done |
 | 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | done |
 | 2 | ART initiation by CD4 stage | one step per age x CD4 cell, each cell weighted by its own age-specific mortality: target x eligible x (w mort / expected mortality + (1 - w) / eligible), capped at the eligible and available population | stage shares, then split across ages by eligibility (stage-average mortality) | done |
-| 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | to do |
+| 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
 | 4 | HIV+ migrants | an input by year, sex and age group replaces net migration x HIV+ population in years it is non-zero | net migration rate x HIV+ population | to do |
 | 5 | Diagnosis | diagnosed stock by CD4, age group and sex, with diagnosis rates as an input | none | to do |
 
@@ -45,5 +45,6 @@ Inputs, not engine (set by the caller):
 - **Rows 0-1.** Against the oracle with `dll_art_midyear` added (PAN 2026, family 1): PLHIV and AIDS deaths within
   9e-16 every year 1971-2030; worst single cell 5.1e-15.
 - **Rows 0-2.** With `dll_art_cellalloc` added: PLHIV and deaths within 9e-16; worst single cell 4.2e-15.
+- **Rows 0-3.** With `dll_steporder` added: PLHIV and deaths within 1.2e-15; worst single cell 4e-15.
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
