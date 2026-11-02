@@ -937,10 +937,27 @@ struct AdultHivModelSimulation<Config> {
     auto& n_ha = state_next.ha;
     auto& i_ha = intermediate.ha;
     const bool epp = p_ha.epp_age_model == 1;
+    // csavr_dll_model = 1: the CSAVR DLL allocates in one step per age x CD4
+    // cell, weighting each cell by its own age-specific mortality rather than
+    // the stage average: target x eligible x (w mort / expected mortality +
+    // (1 - w) / eligible), with the same caps
+    const bool cell = p_ha.csavr_dll_model == 1;
 
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-        if (i_ha.artelig_hm(hm) > 0.0) {
+        if (cell && i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) > 0.0) {
+          const real_type el = i_ha.artelig_hahm(hm, ha - hIDX_15PLUS);
+          const real_type w = p_ha.initiation_mortality_weight;
+          real_type share = 0.0;
+          if (i_ha.expect_mort_artelig15plus > 0.0) share += w * p_ha.cd4_mortality(hm, ha, s) / i_ha.expect_mort_artelig15plus;
+          if (i_ha.Xartelig_15plus > 0.0) share += (1.0 - w) / i_ha.Xartelig_15plus;
+          real_type artinit_hahm = i_ha.artinit_hts * el * share;
+          artinit_hahm = std::min(artinit_hahm, el);
+          artinit_hahm = std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * i_ha.grad(hm, ha, s));
+          i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
+          i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
+          n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
+        } else if (!cell && i_ha.artelig_hm(hm) > 0.0) {
           real_type artinit_hahm = i_ha.artinit_hm(hm) *
                                    i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) /
                                    i_ha.artelig_hm(hm);
