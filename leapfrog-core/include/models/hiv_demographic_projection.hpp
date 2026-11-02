@@ -182,6 +182,21 @@ struct HivDemographicProjection<Config> {
           migration_rate = migration_num_ha / (hivpop_ha_postmig - migration_num_ha);
         }
 
+        // csavr_dll_model = 1: the diagnosed stock migrates with the HIV+
+        // migrant input as a share of the untreated stock, otherwise at the
+        // group's rate, and from the year after diagnosis starts the rate is
+        // applied a second time (CSAVR_VARIANT.md, row 5)
+        if (p_ha.csavr_dll_model == 1 && t >= p_ha.diag_start) {
+          for (int hm = 0; hm < hDS; ++hm) {
+            if (hivmigr_on) {
+              n_ha.h_diagpop(hm, ha, s) += n_ha.h_hivpop(hm, ha, s) * migration_rate;
+            } else {
+              n_ha.h_diagpop(hm, ha, s) *= 1.0 + migration_rate;
+            }
+            if (t > p_ha.diag_start) n_ha.h_diagpop(hm, ha, s) *= 1.0 + migration_rate;
+          }
+        }
+
         for (int hm = 0; hm < hDS; ++hm) {
           n_ha.h_hivpop(hm, ha, s) *= 1.0 + migration_rate;
           if (t >= opts.ts_art_start) {
@@ -189,6 +204,28 @@ struct HivDemographicProjection<Config> {
               n_ha.h_artpop(hu, hm, ha, s) *= 1.0 + migration_rate;
             }
           }
+        }
+      }
+    }
+  };
+
+  // csavr_dll_model = 1: at the end of the year the diagnosed stock is held
+  // within [0, untreated + on ART] in each cell (CSAVR_VARIANT.md, row 5)
+  void run_csavr_diag_bound() {
+    const auto& p_ha = pars.ha;
+    if (p_ha.csavr_dll_model != 1 || t < p_ha.diag_start) return;
+    auto& n_ha = state_next.ha;
+    for (int s = 0; s < NS; ++s) {
+      for (int ha = 0; ha < hAG; ++ha) {
+        for (int hm = 0; hm < hDS; ++hm) {
+          real_type cap = n_ha.h_hivpop(hm, ha, s);
+          if (t >= opts.ts_art_start) {
+            for (int hu = 0; hu < hTS; ++hu) cap += n_ha.h_artpop(hu, hm, ha, s);
+          }
+          real_type d = n_ha.h_diagpop(hm, ha, s);
+          if (d > cap) d = cap;
+          if (d < 0.0) d = 0.0;
+          n_ha.h_diagpop(hm, ha, s) = d;
         }
       }
     }
@@ -579,6 +616,22 @@ struct HivDemographicProjection<Config> {
         }
       }
 
+      // csavr_dll_model = 1: the diagnosed stock ages with the untreated
+      // stock from the year after diagnosis starts; nobody enters it at 15
+      // (CSAVR_VARIANT.md, row 5)
+      if (pars.ha.csavr_dll_model == 1) {
+        for (int hm = 0; hm < hDS; ++hm) {
+          for (int hd = 0; hd < hAG; ++hd) {
+            real_type d = 0.0;
+            if (t > pars.ha.diag_start) {
+              d = (1.0 - i_ha.hiv_age_up_prob(hd, s)) * c_ha.h_diagpop(hm, hd, s);
+              if (hd > 0) d += i_ha.hiv_age_up_prob(hd - 1, s) * c_ha.h_diagpop(hm, hd - 1, s);
+            }
+            n_ha.h_diagpop(hm, hd, s) = d;
+          }
+        }
+      }
+
       // Entrants ageing into adult HIV population
       if constexpr (ModelVariant::run_child_model) {
         auto& i_hc = intermediate.hc;
@@ -838,6 +891,9 @@ struct HivDemographicProjection<Config> {
           deaths_migrate_rate = deaths_migrate / i_ha.p_coarse_ages_hivpop(ha, s);
         }
 
+        if (pars.ha.csavr_dll_model == 1 && t > pars.ha.diag_start) {
+          for (int hm = 0; hm < hDS; ++hm) n_ha.h_diagpop(hm, ha, s) *= 1.0 + deaths_migrate_rate;
+        }
         for (int hm = 0; hm < hDS; ++hm) {
           n_ha.h_hivpop(hm, ha, s) *= 1.0 + deaths_migrate_rate;
           if (t > opts.ts_art_start) {

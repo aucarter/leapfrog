@@ -207,6 +207,19 @@
         "r": "hivmigr"
       }
     },
+    "diag_start": {
+      "num_type": "int",
+      "alias": {
+        "r": "diag_start"
+      }
+    },
+    "diag_rate": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::hAG", "SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "diag_rate"
+      }
+    },
     "h_art_stage_dur": {
       "num_type": "real_type",
       "dims": ["SS::hTS - 1"]
@@ -365,6 +378,10 @@
       "dims": ["SS::pAG", "SS::NS"]
     },
     "h_hivpop": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::hAG", "SS::NS"]
+    },
+    "h_diagpop": {
       "num_type": "real_type",
       "dims": ["SS::hDS", "SS::hAG", "SS::NS"]
     },

@@ -23,7 +23,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 2 | ART initiation by CD4 stage | one step per age x CD4 cell, each cell weighted by its own age-specific mortality: target x eligible x (w mort / expected mortality + (1 - w) / eligible), capped at the eligible and available population | stage shares, then split across ages by eligibility (stage-average mortality) | done |
 | 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
 | 4 | HIV+ migrants | in a year where the input (`hivmigr`, [8 groups 15-19 ... 45-49, 50+, sex, year]) is non-zero anywhere, it replaces net migration x HIV+ population at ages 15+, spread evenly over each group's single ages (15-19 for the 15-16 and 17-19 groups); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
-| 5 | Diagnosis | diagnosed stock by CD4, age group and sex, with diagnosis rates as an input | none | to do |
+| 5 | Diagnosis | diagnosed stock `h_diagpop` [CD4, age group, sex], from year index `diag_start`, rates `diag_rate` [CD4, age group, sex, year] as input: ages with the untreated stock (nobody enters at 15); background deaths and migration at the group's rates, migration applied twice after the start year (with the HIV+ migrant input it gains untreated x rate first); each time step before ART, diagnosis of the undiagnosed and the untreated CD4 progression and unscaled mortality; dropouts return to it; initiations come from it, with any excess taken from the age group's diagnosed pro rata; held within [0, untreated + on ART] at year end | none | done |
 
 Inputs, not engine (set by the caller):
 - ART dropout is the annual proportion the DLL applies.
@@ -38,7 +38,8 @@ Inputs, not engine (set by the caller):
   stored CSAVR outputs need the scaling on (PLHIV 0.2% vs 5% off): Spectrum passes it on whatever the DP says
   (inferred; Spectrum.exe is not decompiled). The caller sets `scale_cd4_mort = 1`.
 
-New required parameters: `csavr_dll_model` (int) and `hivmigr` ([8, 2, years]); `process_pjnz()` sets 0 and zeros.
+New required parameters: `csavr_dll_model` (int), `hivmigr` ([8, 2, years]), `diag_start` (int, 0-based year index)
+and `diag_rate` ([hDS, hAG, 2, years]); `process_pjnz()` sets 0, zeros, the projection length (never) and zeros.
 Callers that build parameters without it must add both.
 
 ## Evidence
@@ -57,6 +58,11 @@ Callers that build parameters without it must add both.
 - **Rows 0-3, all files.** 35 CSAVR-fit 2026 files x families 1-3, 5, 6 (Slurm array 409407): 170 of 175 within
   1.5e-14 in PLHIV, deaths, infections, on-ART, total population and every age x sex x year PLHIV cell. The other
   five were URY, whose DP turns the untreated mortality scaling off (above); with it on, URY family 1 is within 7e-16.
-- **Row 4.** LUX and ISL (HIV+ migrant input) and PAN, families 1-3, 5, 6, rows 0-4: every metric within 3.1e-15.
+- **Rows 0-4, all files.** 35 files x families 1-3, 5, 6 (Slurm array 436773): totals (PLHIV, deaths, infections,
+  on-ART, population) within 4.2e-15; every age x sex x year PLHIV cell within 1.9e-13 (largest in ALB, 2-46
+  infections a year).
+- **Row 5.** PAN, families 1-3, 5, 6, with the oracle's diagnosis rates (`l2_diag_rates` from the base run's ART
+  coverage and Spectrum's stored diagnosis parameters): diagnosed total within 1.6e-14, reported new diagnoses within
+  6.7e-16, largest absolute difference in any diagnosed cell 5.9e-13 persons.
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
