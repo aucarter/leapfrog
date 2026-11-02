@@ -200,6 +200,13 @@
         "r": "csavr_dll_model"
       }
     },
+    "hiv_migrants": {
+      "num_type": "real_type",
+      "dims": ["8", "SS::NS", "opts.proj_steps"],
+      "alias": {
+        "r": "hivmigr"
+      }
+    },
     "h_art_stage_dur": {
       "num_type": "real_type",
       "dims": ["SS::hTS - 1"]

@@ -283,6 +283,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     epp_age_model = 0L,
     epp_fix_bugs = 0L,
     csavr_dll_model = 0L,
+    hivmigr = array(0, c(8L, 2L, proj_years_count)),
     pAG_INCIDPOP = pAG_INCIDPOP,
     pIDX_INCIDPOP = pIDX_INCIDPOP,
     fert_rat = fert_rat,

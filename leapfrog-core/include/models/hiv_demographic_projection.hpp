@@ -129,11 +129,39 @@ struct HivDemographicProjection<Config> {
   void run_hivpop_end_year_migration() {
     auto& n_ha = state_next.ha;
     auto& i_dp = intermediate.dp;
+    const auto& p_ha = pars.ha;
+
+    // csavr_dll_model = 1: in a year where Spectrum's HIV+ migrant input is
+    // non-zero anywhere, the CSAVR DLL replaces net migration x HIV+ population
+    // at ages 15+ by the input, spread evenly over the single ages of its 5-year
+    // group (15-19 for the 15-16 and 17-19 groups; 50+ over 50-80). HIV-negative
+    // people still migrate at the net rate, so the total population takes the
+    // input in place of the HIV+ share of net migration (CSAVR_VARIANT.md, row 4).
+    bool hivmigr_on = false;
+    if (p_ha.csavr_dll_model == 1) {
+      for (int s = 0; s < NS; ++s)
+        for (int g = 0; g < 8; ++g)
+          if (p_ha.hiv_migrants(g, s, t) != 0.0) hivmigr_on = true;
+    }
 
     // remove net migration from hiv stratified population
     for (int s = 0; s < NS; ++s) {
       for (int a = 0; a < pAG; ++a) {
         n_ha.p_net_migration_hivpop(a, s) = n_ha.p_hivpop(a, s) * i_dp.migration_rate(a, s);
+      }
+      if (hivmigr_on) {
+        auto& n_dp = state_next.dp;
+        int a = p_idx_hiv_first_adult;
+        for (int ha = 0; ha < hAG; ++ha) {
+          for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
+            const real_type mig = p_ha.hiv_migrants(ha < 2 ? 0 : ha - 1, s, t) /
+                                  (ha < 2 ? 5.0 : static_cast<real_type>(hAG_span[ha]));
+            n_dp.p_totpop(a, s) += mig - n_ha.p_net_migration_hivpop(a, s);
+            n_ha.p_net_migration_hivpop(a, s) = mig;
+          }
+        }
+      }
+      for (int a = 0; a < pAG; ++a) {
         n_ha.p_hivpop(a, s) += n_ha.p_net_migration_hivpop(a, s);
       }
     }

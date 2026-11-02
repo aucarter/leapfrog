@@ -22,7 +22,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | done |
 | 2 | ART initiation by CD4 stage | one step per age x CD4 cell, each cell weighted by its own age-specific mortality: target x eligible x (w mort / expected mortality + (1 - w) / eligible), capped at the eligible and available population | stage shares, then split across ages by eligibility (stage-average mortality) | done |
 | 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
-| 4 | HIV+ migrants | an input by year, sex and age group replaces net migration x HIV+ population in years it is non-zero | net migration rate x HIV+ population | to do |
+| 4 | HIV+ migrants | in a year where the input (`hivmigr`, [8 groups 15-19 ... 45-49, 50+, sex, year]) is non-zero anywhere, it replaces net migration x HIV+ population at ages 15+, spread evenly over each group's single ages (15-19 for the 15-16 and 17-19 groups); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
 | 5 | Diagnosis | diagnosed stock by CD4, age group and sex, with diagnosis rates as an input | none | to do |
 
 Inputs, not engine (set by the caller):
@@ -32,6 +32,14 @@ Inputs, not engine (set by the caller):
   group, then applies one survival to all of 80+ (decompile `at_63adae80.c` ~L856-878: 65 copies, then
   `+=` at offset 0x208 = age 80). Its survival array has 66 entries (15-80), so there is no 79-to-80 survival.
   In leapfrog this is `Sx[81, , ] <- Sx[82, , ]`, as leapfrogfit's `epp_open_age_survival` sets for EPP.
+- **Untreated mortality scaling on.** The DLL scales untreated CD4 mortality by the untreated share when a flag
+  it receives from Spectrum is set (`initialize_from_c`: `S_FP_C + 0x1e0` -> `this + 0x1be8`, read at
+  `at_63adae80.c` ~L1558, gating the scale at ~L1619). URY's DP holds `scale_cd4_mort = 0`, yet Spectrum's
+  stored CSAVR outputs need the scaling on (PLHIV 0.2% vs 5% off): Spectrum passes it on whatever the DP says
+  (inferred; Spectrum.exe is not decompiled). The caller sets `scale_cd4_mort = 1`.
+
+New required parameters: `csavr_dll_model` (int) and `hivmigr` ([8, 2, years]); `process_pjnz()` sets 0 and zeros.
+Callers that build parameters without it must add both.
 
 ## Evidence
 
@@ -46,5 +54,9 @@ Inputs, not engine (set by the caller):
   9e-16 every year 1971-2030; worst single cell 5.1e-15.
 - **Rows 0-2.** With `dll_art_cellalloc` added: PLHIV and deaths within 9e-16; worst single cell 4.2e-15.
 - **Rows 0-3.** With `dll_steporder` added: PLHIV and deaths within 1.2e-15; worst single cell 4e-15.
+- **Rows 0-3, all files.** 35 CSAVR-fit 2026 files x families 1-3, 5, 6 (Slurm array 409407): 170 of 175 within
+  1.5e-14 in PLHIV, deaths, infections, on-ART, total population and every age x sex x year PLHIV cell. The other
+  five were URY, whose DP turns the untreated mortality scaling off (above); with it on, URY family 1 is within 7e-16.
+- **Row 4.** LUX and ISL (HIV+ migrant input) and PAN, families 1-3, 5, 6, rows 0-4: every metric within 3.1e-15.
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
