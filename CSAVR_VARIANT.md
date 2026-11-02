@@ -33,8 +33,11 @@ Inputs, not engine (set by the caller):
 - Dropouts recover one CD4 stage (`art_dropout_recover_cd4 = TRUE`, as eppasm).
 - **Open age group survival.** The DLL ages ages 15-79 up one year and adds last year's 80+ into the open
   group, then applies one survival to all of 80+ (decompile `at_63adae80.c` ~L856-878: 65 copies, then
-  `+=` at offset 0x208 = age 80). Its survival array has 66 entries (15-80), so there is no 79-to-80 survival.
-  In leapfrog this is `Sx[81, , ] <- Sx[82, , ]`, as leapfrogfit's `epp_open_age_survival` sets for EPP.
+  `+=` at offset 0x208 = age 80). Its survival array has 66 entries (15-80), so everyone 80+ survives at the
+  age-80 entry. Spectrum fills it with its age-80 survival (the 79-to-80 value), not the open group's: with the
+  open group's (as eppasm, and EPP's age model), PAN family 1's PLHIV at 50+ is 1.8e-4 low before ART; with the
+  age-80 value, 2e-7, the level of every other age group (measured; the caller is not decompiled). In leapfrog
+  this is `Sx[82, , ] <- Sx[81, , ]`.
 - **Untreated mortality scaling on.** The DLL scales untreated CD4 mortality by the untreated share when a flag
   it receives from Spectrum is set (`initialize_from_c`: `S_FP_C + 0x1e0` -> `this + 0x1be8`, read at
   `at_63adae80.c` ~L1558, gating the scale at ~L1619). URY's DP holds `scale_cd4_mort = 0`, yet Spectrum's
@@ -51,7 +54,7 @@ Callers that build parameters without `process_pjnz()` must add all four.
   and `art_dropout_recover_cd4` equals eppasm's per-step direct incidence on PAN 2026 (family 1): PLHIV within
   1.1e-5, AIDS deaths within 8e-5, 1970-2020.
 - **Row 0.** Against eppasm's annual direct incidence with the DLL's previous-year weights (PAN 2026, family 1),
-  with the open-age survival above: PLHIV, new infections, AIDS deaths, on-ART and total population within 9e-16
+  with the open-age survival set the same way on both sides: PLHIV, new infections, AIDS deaths, on-ART and total population within 9e-16
   every year 1971-2030; worst single age x sex x year PLHIV cell 4.7e-15. Without the open-age survival, deaths
   drift to 1.7e-4 by 2025 (80+ population up to 9.7% off).
 - **Rows 0-1.** Against the oracle with `dll_art_midyear` added (PAN 2026, family 1): PLHIV and AIDS deaths within
