@@ -659,8 +659,11 @@ struct AdultHivModelSimulation<Config> {
     for (int s = 0; s < NS; ++s) {
       for (int ha = 0; ha < hAG; ++ha) {
         for (int hm = 0; hm < hDS; ++hm) {
-          n_ha.h_hivpop(hm, ha, s) += opts.dt * i_ha.grad(hm, ha, s);
+          // the step's new infections too (transmission-rate incidence; zero
+          // under the annual direct incidence of row 0)
+          n_ha.h_hivpop(hm, ha, s) += opts.dt * (i_ha.grad(hm, ha, s) + i_ha.grad_infections(hm, ha, s));
           i_ha.grad(hm, ha, s) = 0.0;
+          i_ha.grad_infections(hm, ha, s) = 0.0;
         }
         for (int hm = i_ha.everARTelig_idx; hm < hDS; ++hm) {
           for (int hu = 0; hu < hTS; ++hu) {
