@@ -2,9 +2,11 @@
 
 `csavr_dll_model` is one integer parameter in `HaConfig` (R name `csavr_dll_model`; `process_pjnz()` sets 0). With 1,
 leapfrog behaves as the projection inside Spectrum's CSAVR engine (`eppcsavri686.dll`, Spectrum 6.44), which
-is eppasm's age model plus a few behaviours of its own. It is meant to be used with `epp_age_model = 1`,
-direct incidence input (`incidence_model_choice` direct) and the coarse static-entrant variant
-(`HivCoarseAgeStratificationEntrants`).
+is eppasm's age model plus a few behaviours of its own. It is meant to be used with `epp_age_model = 1` and the
+coarse static-entrant variant (`HivCoarseAgeStratificationEntrants`). Five of the DLL's six curve families give
+incidence directly (`incidence_model_choice` 0); the r-logistic (family 4) runs EPP's transmission model with r(t)
+per time step (`incidence_model_choice` 1, `transmission_rate_hts`, seed `initial_incidence` at step
+`epidemic_start_hts`), so row 0 applies to the direct families only.
 
 - **0** (default): unchanged.
 - **1**: the CSAVR engine's projection.
@@ -21,7 +23,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 0 | New infections | added once per year, after the time steps (eppasm `EPP_DIRECTINCID_ANN`); age distribution weights last year's HIV-negative population at each single age, rate clamped to [0, 1], capped at this year's HIV-negative population | spread over the time steps, weighted by the current population | done |
 | 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | done |
 | 2 | ART initiation by CD4 stage | one step per age x CD4 cell, each cell weighted by its own age-specific mortality: target x eligible x (w mort / expected mortality + (1 - w) / eligible), capped at the eligible and available population | stage shares, then split across ages by eligibility (stage-average mortality) | done |
-| 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
+| 3 | Order within a time step | untreated update (with the step's new infections under transmission-rate incidence), then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
 | 4 | HIV+ migrants | in a year where the input (`hivmigr`, [8 groups 15-19 ... 45-49, 50+, sex, year]) is non-zero anywhere, it replaces net migration x HIV+ population at ages 15+, spread evenly over each group's single ages (15-19 for the 15-16 and 17-19 groups); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
 | 5 | Diagnosis | diagnosed stock `h_diagpop` [CD4, age group, sex], from year index `diag_start`, rates `diag_rate` [CD4, age group, sex, year] as input: ages with the untreated stock (nobody enters at 15); background deaths and migration at the group's rates, migration applied twice after the start year (with the HIV+ migrant input it gains untreated x rate first); each time step before ART, diagnosis of the undiagnosed and the untreated CD4 progression and unscaled mortality; dropouts return to it; initiations come from it, with any excess taken from the age group's diagnosed pro rata; held within [0, untreated + on ART] at year end | none | done |
 
