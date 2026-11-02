@@ -19,7 +19,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | # | Area | `csavr_dll_model = 1` (CSAVR DLL) | `0` | Status |
 |---|---|---|---|---|
 | 0 | New infections | added once per year, after the time steps (eppasm `EPP_DIRECTINCID_ANN`); age distribution weights last year's HIV-negative population at each single age, rate clamped to [0, 1], capped at this year's HIV-negative population | spread over the time steps, weighted by the current population | done |
-| 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | to do |
+| 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | done |
 | 2 | ART initiation by CD4 stage | one step per cell: target x eligible x (w mortality share + (1 - w) eligibility share), capped at the eligible population | `epp_age_model` allocation | to do |
 | 3 | Order within a time step | untreated update, then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | to do |
 | 4 | HIV+ migrants | an input by year, sex and age group replaces net migration x HIV+ population in years it is non-zero | net migration rate x HIV+ population | to do |
@@ -42,5 +42,7 @@ Inputs, not engine (set by the caller):
   with the open-age survival above: PLHIV, new infections, AIDS deaths, on-ART and total population within 9e-16
   every year 1971-2030; worst single age x sex x year PLHIV cell 4.7e-15. Without the open-age survival, deaths
   drift to 1.7e-4 by 2025 (80+ population up to 9.7% off).
+- **Rows 0-1.** Against the oracle with `dll_art_midyear` added (PAN 2026, family 1): PLHIV and AIDS deaths within
+  9e-16 every year 1971-2030; worst single cell 5.1e-15.
 - **Off is unchanged.** `csavr_dll_model = 0` on this build reproduces the starting build's PAN comparison to every
   printed digit.
