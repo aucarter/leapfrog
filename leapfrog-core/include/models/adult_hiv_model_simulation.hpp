@@ -965,6 +965,8 @@ struct AdultHivModelSimulation<Config> {
     }
     t0 = std::max(t0, 0);
     t1 = std::max(t1, 0);
+    // SCRATCH PROBE: year t's coverage held through year t
+    w = 1.0; t1 = t;
 
     i_ha.Xartelig_15plus = 0.0;
     nda::fill(i_ha.artelig_hm, 0.0);
