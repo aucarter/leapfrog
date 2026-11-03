@@ -975,9 +975,12 @@ struct AdultHivModelSimulation<Config> {
         for (int ha = hIDX_15PLUS; ha < hAG; ++ha) i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) = 0.0;
         continue;
       }
+      // Untreated at the end of the step, after its progression, deaths and new
+      // infections, so the stage reaches the coverage once the step is applied
       real_type on_art = 0.0;
       for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
-        const real_type untreated = cov > 0.0 ? n_ha.h_hivpop(hm, ha, s) : 0.0;
+        const real_type untreated = cov > 0.0 ?
+          std::max(n_ha.h_hivpop(hm, ha, s) + opts.dt * (i_ha.grad(hm, ha, s) + i_ha.grad_infections(hm, ha, s)), 0.0) : 0.0;
         i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) = untreated;
         i_ha.artelig_hm(hm) += untreated;
         if (hm >= i_ha.everARTelig_idx) {
