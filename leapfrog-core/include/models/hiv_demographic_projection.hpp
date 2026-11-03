@@ -146,10 +146,38 @@ struct HivDemographicProjection<Config> {
           if (p_ha.hiv_migrants(g, s, t) != 0.0) hivmigr_on = true;
     }
 
+    bool hivmigr_input_on = false;
+    if (p_ha.csavr_dll_model != 1) {
+      for (int s = 0; s < NS; ++s)
+        for (int a = p_idx_hiv_first_adult; a < pAG; ++a)
+          if (p_ha.hiv_migrants_by_age(a, s, t) != 0.0) hivmigr_input_on = true;
+    }
+
     // remove net migration from hiv stratified population
     for (int s = 0; s < NS; ++s) {
       for (int a = 0; a < pAG; ++a) {
         n_ha.p_net_migration_hivpop(a, s) = n_ha.p_hivpop(a, s) * i_dp.migration_rate(a, s);
+      }
+      // Spectrum's <HIVMigrantsByAgeSex MV> outside the CSAVR variant: in a year
+      // where any entry is non-zero, the input replaces net migration x HIV+
+      // population at ages 15+, by single age (a five-year group spread evenly,
+      // 80+ at age 80). Spectrum's stored HIV+ migrants (<HIVMigrBySingleAge MV>)
+      // equal it in every such year, and take the default in every other year,
+      // in the 2026 NPL, NLD, CYP, DEU, PAK, PHL and THA files. As in the CSAVR
+      // DLL, migrants take their age group's CD4 and ART mix; a group with no
+      // HIV+ people takes none, so it stays empty.
+      if (p_ha.csavr_dll_model != 1 && hivmigr_input_on) {
+        auto& n_dp = state_next.dp;
+        int a = p_idx_hiv_first_adult;
+        for (int ha = 0; ha < hAG; ++ha) {
+          real_type hivpop_ha = 0.0;
+          for (int i = 0; i < hAG_span[ha]; ++i) hivpop_ha += n_ha.p_hivpop(a + i, s);
+          for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
+            const real_type mig = hivpop_ha > 0.0 ? p_ha.hiv_migrants_by_age(a, s, t) : 0.0;
+            n_dp.p_totpop(a, s) += mig - n_ha.p_net_migration_hivpop(a, s);
+            n_ha.p_net_migration_hivpop(a, s) = mig;
+          }
+        }
       }
       if (hivmigr_on) {
         auto& n_dp = state_next.dp;
@@ -180,7 +208,7 @@ struct HivDemographicProjection<Config> {
         }
 
         real_type migration_rate = 0.0;
-        if (hivpop_ha_postmig > 0.0) {
+        if (hivpop_ha_postmig - migration_num_ha > 0.0) {
           migration_rate = migration_num_ha / (hivpop_ha_postmig - migration_num_ha);
         }
 
