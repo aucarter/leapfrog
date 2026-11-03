@@ -140,7 +140,8 @@ struct HivDemographicProjection<Config> {
     // migrate at the net rate, so the total population takes the input in place
     // of the HIV+ share of net migration (CSAVR_VARIANT.md, row 4).
     bool hivmigr_on = false;
-    if (p_ha.csavr_dll_model == 1) {
+    // SCRATCH PROBE: the input applies whenever supplied, not only with csavr_dll_model = 1
+    {
       for (int s = 0; s < NS; ++s)
         for (int g = 0; g < 9; ++g)
           if (p_ha.hiv_migrants(g, s, t) != 0.0) hivmigr_on = true;
