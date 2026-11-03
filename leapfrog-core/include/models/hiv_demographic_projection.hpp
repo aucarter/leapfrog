@@ -522,8 +522,8 @@ struct HivDemographicProjection<Config> {
   real_type pwid_adjusted_surv(real_type surv, int a, int s) {
     // csavr_dll_model = 1: Spectrum's CSAVR engine has no PWID mortality
     // adjustment in its projection (CSAVR_VARIANT.md, row 6)
-    const bool no_adjustment = pars.ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS ||
-      pars.ha.csavr_dll_model == 1 ||
+    // SCRATCH PROBE: applied under direct incidence too
+    const bool no_adjustment = pars.ha.csavr_dll_model == 1 ||
       a < p_idx_hiv_first_adult || a >= 50 ||
       pars.ha.pwid_sex_ratio(t) < 0.0;
 
