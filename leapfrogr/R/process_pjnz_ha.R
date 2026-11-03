@@ -286,6 +286,22 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     art_cd4_coverage[, 2, ] <- block1 / 100
   }
 
+  # HIV+ migrants (<HIVMigrantsByAgeSex MV>) by single age: rows after the tag are a description,
+  # <Value>, then 17 five-year groups (0-4 ... 80+) for males and the same for females. Spectrum
+  # spreads a group evenly over its ages and puts 80+ at age 80 (<HIVMigrBySingleAge MV>, 2026 NPL,
+  # DEU, PAK).
+  hiv_migrants_by_age <- array(0, c(81L, 2L, proj_years_count))
+  if ("<HIVMigrantsByAgeSex MV>" %in% dat$dp_raw$Tag) {
+    i_mig <- which(dat$dp_raw[, 1] == "<HIVMigrantsByAgeSex MV>")
+    cols <- 3L + seq_len(proj_years_count)
+    for (s in 1:2) {
+      x <- suppressWarnings(matrix(as.numeric(unlist(dat$dp_raw[i_mig + 2L + 17L * (s - 1L) + 1:17, cols])), nrow = 17L))
+      x[is.na(x)] <- 0
+      hiv_migrants_by_age[1:80, s, ] <- x[rep(1:16, each = 5L), , drop = FALSE] / 5
+      hiv_migrants_by_age[81, s, ] <- x[17, ]
+    }
+  }
+
   art_initiation_rate <- pars$art_initiation_rate
   if (is.null(pars$art_initiation_rate)) {
     art_initiation_rate <- array(0.0, c(2L, proj_years_count))
@@ -297,6 +313,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     art_entry_option = art_entry_option(art_coverage_selection),
     art_initiation_rate = art_initiation_rate,
     art_cd4_coverage = art_cd4_coverage,
+    hiv_migrants_by_age = hiv_migrants_by_age,
     transmission_rate_hts = transmission_rate_hts,
     initial_incidence = initial_incidence,
     epidemic_start_hts = epidemic_start_hts,

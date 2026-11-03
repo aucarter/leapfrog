@@ -172,6 +172,8 @@ type
     artInitiationRateLength: Integer;
     artCd4Coverage: PDouble;
     artCd4CoverageLength: Integer;
+    hivMigrantsByAge: PDouble;
+    hivMigrantsByAgeLength: Integer;
 end;
 
 type
@@ -222,6 +224,7 @@ type
     artEntryOption: Integer;
     artInitiationRate: TGBFixedArray<Double>;
     artCd4Coverage: TGBFixedArray<Double>;
+    hivMigrantsByAge: TGBFixedArray<Double>;
     function getView(): LeapfrogHivAdultParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1174,6 +1177,7 @@ begin;
   pwidSexRatio.Free;
   artInitiationRate.Free;
   artCd4Coverage.Free;
+  hivMigrantsByAge.Free;
   inherited;
 end;
 
@@ -1293,6 +1297,8 @@ begin;
   Result.artInitiationRateLength := artInitiationRate.GetLength();
   Result.artCd4Coverage := PDouble(artCd4Coverage.data);
   Result.artCd4CoverageLength := artCd4Coverage.GetLength();
+  Result.hivMigrantsByAge := PDouble(hivMigrantsByAge.data);
+  Result.hivMigrantsByAgeLength := hivMigrantsByAge.GetLength();
 end;
 
 function LeapfrogHivAdultState.getView(): LeapfrogHivAdultStateView;
@@ -2040,6 +2046,7 @@ begin;
   pwidSexRatio.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'pwidSexRatio');
   artInitiationRate.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'artInitiationRate');
   artCd4Coverage.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'artCd4Coverage');
+  hivMigrantsByAge.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'hivMigrantsByAge');
 end;
 
 procedure LeapfrogHivAdultState.writeToDisk(dir: string);
