@@ -294,23 +294,29 @@ struct ChildModelSimulation<Config> {
         } else {
           i_hc.PMTCT_coverage(hp) = p_hc.PMTCT(hp, t) / sumARV *
             i_hc.on_PMTCT / n_hc.pmtct_need;
-          if(hp == BPLUS_BEFORE){
-            //Dropped off ART, started before
-            // n_hc.mtct_by_source_women(OPTION_A) += p_hc.PMTCT(hp, t) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //number
-            i_hc.PMTCT_before_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
-            n_hc.mtct_by_source_women(BPLUS_BEFORE_DROPOUT) += i_hc.PMTCT_before_dropout * n_hc.pmtct_need; //number
-          }
-          if(hp == BPLUS_EARLY){
-            //Dropped off ART, started during
-            i_hc.PMTCT_during_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
-            n_hc.mtct_by_source_women(BPLUS_DURING_DROPOUT) += i_hc.PMTCT_during_dropout * n_hc.pmtct_need; //number
-          }
-          i_hc.PMTCT_coverage(hp) *=  p_hc.PMTCT_dropout(hp, 0, t);
-          // women covered, consistent with the capped coverage
-          n_hc.mtct_by_source_women(hp) += i_hc.PMTCT_coverage(hp) * n_hc.pmtct_need;
-
         }
+      }// end hPS
+    } //end else
 
+    // Retention at delivery, whichever way coverage was entered: women not retained transmit at the untreated
+    // rate. Applying it only to coverage entered as numbers left DNK's perinatal MTCT 1.86 - 1.89 points under
+    // Spectrum's MTCTRate6Wks in every year 2005 - 2020 (retention 0.909 x 0.95 coverage x the untreated rate;
+    // ITA, also entered as percentages, the same way)
+    if (n_hc.pmtct_need > 0) {
+      for (int hp = 0; hp < hPS; ++hp) {
+        if(hp == BPLUS_BEFORE){
+          //Dropped off ART, started before
+          i_hc.PMTCT_before_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
+          n_hc.mtct_by_source_women(BPLUS_BEFORE_DROPOUT) += i_hc.PMTCT_before_dropout * n_hc.pmtct_need; //number
+        }
+        if(hp == BPLUS_EARLY){
+          //Dropped off ART, started during
+          i_hc.PMTCT_during_dropout = i_hc.PMTCT_coverage(hp) * (1 - p_hc.PMTCT_dropout(hp, 0, t)); //coverage
+          n_hc.mtct_by_source_women(BPLUS_DURING_DROPOUT) += i_hc.PMTCT_during_dropout * n_hc.pmtct_need; //number
+        }
+        i_hc.PMTCT_coverage(hp) *=  p_hc.PMTCT_dropout(hp, 0, t);
+        // women covered, consistent with the capped coverage
+        n_hc.mtct_by_source_women(hp) += i_hc.PMTCT_coverage(hp) * n_hc.pmtct_need;
       }// end hPS
 
       //No ART
@@ -320,7 +326,7 @@ struct ChildModelSimulation<Config> {
           n_hc.mtct_by_source_women(NO_ART) -= n_hc.mtct_by_source_women(ms);
         }
       }
-    } //end else
+    }
   };
 
   void convert_PMTCT_pre_bf() {
