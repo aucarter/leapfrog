@@ -967,6 +967,17 @@ struct AdultHivModelSimulation<Config> {
   void allocate_art_initiation_by_cd4() {
     const auto& p_ha = pars.ha;
     auto& i_ha = intermediate.ha;
+    // initiation_allocation_method = 4 (Spectrum NewARTPatAllocationMethod 4): lowest CD4 first. Each stage, from the
+    // lowest, initiates all its eligible before the next stage up receives any, and the weights are not used
+    // (EPP 2025_R1 AgeModel.run_hiv_model; eppasm src/eppasm.cpp, art_alloc_method == 4)
+    if (p_ha.initiation_allocation_method == 4) {
+      real_type remaining = i_ha.artinit_hts;
+      for (int hm = hDS - 1; hm >= i_ha.anyelig_idx; --hm) {
+        i_ha.artinit_hm(hm) = std::min(remaining, i_ha.artelig_hm(hm));
+        remaining -= i_ha.artinit_hm(hm);
+      }
+      return;
+    }
     if (p_ha.epp_age_model == 1) {
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
         real_type eligibility_by_stage = 0.0;
