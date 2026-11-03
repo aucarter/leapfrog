@@ -514,16 +514,19 @@ struct HivDemographicProjection<Config> {
   // Returns survival probability for HIV+ people at age a, adjusted down for PWID excess
   // mortality. Only applies to working ages 15-49; returns surv unchanged outside that range.
   //
-  // This is not used when running with direct incidence input
-  // (incidence_model_choice == 0) or if pwid_sex_ratio < 0. Spectrum uses
-  // pwid_sex_ratio = -1 to indicate that PWID adjustment is not used.
+  // This is not used if pwid_sex_ratio < 0. Spectrum uses pwid_sex_ratio = -1
+  // to indicate that PWID adjustment is not used. It applies under direct
+  // incidence as well: Spectrum stores non-AIDS deaths among PWID
+  // (<NonAIDSDeathsAmongIDU MV>) in direct-incidence files, at the input rate
+  // times the HIV+ population and its PWID share (2026 MYS 1990-2000, within
+  // rounding), and with the adjustment the 2026 AEM files with a PWID share
+  // (MYS, VNM, MMR, NPL, IDN, THA, PAK) move toward Spectrum's PLHIV.
   //
   // pwid_hivpos_nonaids_mortality is expected as a rate (0-1)
   real_type pwid_adjusted_surv(real_type surv, int a, int s) {
     // csavr_dll_model = 1: Spectrum's CSAVR engine has no PWID mortality
     // adjustment in its projection (CSAVR_VARIANT.md, row 6)
-    const bool no_adjustment = pars.ha.incidence_model_choice == SS::INCIDMOD_DIRECTINCID_HTS ||
-      pars.ha.csavr_dll_model == 1 ||
+    const bool no_adjustment = pars.ha.csavr_dll_model == 1 ||
       a < p_idx_hiv_first_adult || a >= 50 ||
       pars.ha.pwid_sex_ratio(t) < 0.0;
 
