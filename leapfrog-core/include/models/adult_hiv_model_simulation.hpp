@@ -734,7 +734,7 @@ struct AdultHivModelSimulation<Config> {
       //   so we fallback to number or %.
       if (p_ha.art_entry_option == SS::ART_ENTRY_PERCENT_BY_CD4) {
         // Targets are set per CD4 stage, so step 1 is replaced
-        calc_artinit_from_percent_by_cd4(s, hiv_step);
+        calc_artinit_from_percent_by_cd4(s);
         allocate_art_initiation_by_age(s);
         continue;
       } else if (p_ha.art_entry_option == SS::ART_ENTRY_INITIATION_RATE) {
@@ -944,31 +944,27 @@ struct AdultHivModelSimulation<Config> {
   // <CD4Coverage MV2>): coverage is a target for each CD4 stage, on ART (by
   // stage at initiation) over on ART plus untreated in that stage, 15+.
   // Spectrum 6.28 BRA 2023 stores year-end coverage equal to the input in every
-  // stage, sex and year 1997-2025. Coverage is interpolated within the year as
-  // a percent target is, and each stage initiates its shortfall; within the
+  // stage, sex and year 1997-2025. Year t's coverage holds for every time step
+  // of year t, not interpolated from year t-1: in BRA's first ART year (1997, 0
+  // to 40%) the interpolated target gave 1.42x Spectrum's untreated deaths, the
+  // held one 1.004x, the same offset the file carries before ART. This is read
+  // from Spectrum's output, not its code, and no mid-year file using this
+  // option has been checked. Each stage initiates its shortfall; within the
   // stage everyone untreated is eligible, so the age allocation weights by the
   // untreated population. Stages without coverage initiate no one: special
-  // populations eligible regardless of CD4 are not given a coverage here (under
-  // 1% of BRA's adults on ART are in stages above 250).
-  void calc_artinit_from_percent_by_cd4(int s, int hiv_step) {
+  // populations eligible regardless of CD4 are not given a coverage here (BRA's
+  // adults on ART above CD4 250 are within 3% of Spectrum's without it; most
+  // are children on ART reaching 15).
+  void calc_artinit_from_percent_by_cd4(int s) {
     const auto& p_ha = pars.ha;
     const auto& n_ha = state_next.ha;
     auto& i_ha = intermediate.ha;
-
-    const bool art_midyear = opts.proj_period_int == PROJPERIOD_MIDYEAR;
-    real_type w = opts.dt * (hiv_step + 1.0);
-    int t0 = t - 1, t1 = t;
-    if (art_midyear) {
-      if (w < 0.5) { t0 = t - 2; t1 = t - 1; w += 0.5; } else { w -= 0.5; }
-    }
-    t0 = std::max(t0, 0);
-    t1 = std::max(t1, 0);
 
     i_ha.Xartelig_15plus = 0.0;
     nda::fill(i_ha.artelig_hm, 0.0);
     for (int hm = 0; hm < hDS; ++hm) {
       i_ha.artinit_hm(hm) = 0.0;
-      const real_type cov = (1.0 - w) * p_ha.art_cd4_coverage(hm, s, t0) + w * p_ha.art_cd4_coverage(hm, s, t1);
+      const real_type cov = p_ha.art_cd4_coverage(hm, s, t);
       if (hm < i_ha.anyelig_idx) {
         for (int ha = hIDX_15PLUS; ha < hAG; ++ha) i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) = 0.0;
         continue;
