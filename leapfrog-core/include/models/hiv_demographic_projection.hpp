@@ -524,7 +524,7 @@ struct HivDemographicProjection<Config> {
     // adjustment in its projection (CSAVR_VARIANT.md, row 6)
     // SCRATCH PROBE: applied under direct incidence too
     const bool no_adjustment = pars.ha.csavr_dll_model == 1 ||
-      a < p_idx_hiv_first_adult || a >= 50 ||
+      a < p_idx_hiv_first_adult ||  // SCRATCH PROBE 2: all adult ages
       pars.ha.pwid_sex_ratio(t) < 0.0;
 
     if (no_adjustment) return surv;
