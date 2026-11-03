@@ -252,7 +252,8 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   # value per risk-group subpopulation (observed length 9 for a Goals-enabled
   # PJNZ with multiple EPP subpops).
   if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality[1])) {
-    pwid_hivpos_nonaids_mortality <- pars$pwid_hivpos_nonaids_mortality[1]
+    # <EPPIDUMortality MV> is a percent per year (EPP's 15-49 model divides it by 100); the engine reads a rate
+    pwid_hivpos_nonaids_mortality <- pars$pwid_hivpos_nonaids_mortality[1] / 100
     if (length(pars$pwid_sex_ratio) < proj_years_count) {
       pwid_sex_ratio <- rep(pars$pwid_sex_ratio, proj_years_count)
     } else {
