@@ -24,7 +24,7 @@ Each row is one behaviour of the DLL, read from its decompile and confirmed agai
 | 1 | ART targets within the year | interpolated as for a mid-year projection whatever the projection period | by projection period | done |
 | 2 | ART initiation by CD4 stage | one step per age x CD4 cell, each cell weighted by its own age-specific mortality: target x eligible x (w mort / expected mortality + (1 - w) / eligible), capped at the eligible and available population | stage shares, then split across ages by eligibility (stage-average mortality) | done |
 | 3 | Order within a time step | untreated update (with the step's new infections under transmission-rate incidence), then ART deaths and duration, then dropout from the updated ART stock, before initiation | leapfrog's order | done |
-| 4 | HIV+ migrants | in a year where the input (`hivmigr`, [8 groups 15-19 ... 45-49, 50+, sex, year]) is non-zero anywhere, it replaces net migration x HIV+ population at ages 15+, spread evenly over each group's single ages (15-19 for the 15-16 and 17-19 groups); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
+| 4 | HIV+ migrants | in a year where any of the input's 9 slots per sex (`hivmigr`, [9, sex, year]) is non-zero, it replaces net migration x HIV+ population at ages 15+, spread evenly over a group's single ages: slot 1 for the 15-16 and 17-19 groups (input / 5 per age), slot ha - 1 (0-based) for the others, so the 50+ group reads slot 8 and slot 9 only marks the year (spectrumC L1263 - 1280 checks 9 entries; L1964 - 1975 places them); HIV-negative people still migrate at the net rate | net migration rate x HIV+ population | done |
 | 5 | Diagnosis | diagnosed stock `h_diagpop` [CD4, age group, sex], from year index `diag_start`, rates `diag_rate` [CD4, age group, sex, year] as input: ages with the untreated stock (nobody enters at 15); background deaths and migration at the group's rates, migration applied twice after the start year (with the HIV+ migrant input it gains untreated x rate first); each time step before ART, diagnosis of the undiagnosed and the untreated CD4 progression and unscaled mortality; dropouts return to it; initiations come from it, with any excess taken from the age group's diagnosed pro rata; held within [0, untreated + on ART] at year end | none | done |
 | 6 | PWID excess mortality | not applied: the DLL's projection has no PWID input (its only IDU terms are likelihoods, `llik_IDUBothSexes`) and its background deaths take one survival-based rate per age group | applied to HIV+ ages 15-49 under transmission-rate incidence when `pwid_sex_ratio` >= 0 | done |
 
@@ -44,7 +44,7 @@ Inputs, not engine (set by the caller):
   stored CSAVR outputs need the scaling on (PLHIV 0.2% vs 5% off): Spectrum passes it on whatever the DP says
   (inferred; Spectrum.exe is not decompiled). The caller sets `scale_cd4_mort = 1`.
 
-New required parameters: `csavr_dll_model` (int), `hivmigr` ([8, 2, years]), `diag_start` (int, 0-based year index)
+New required parameters: `csavr_dll_model` (int), `hivmigr` ([9, 2, years]), `diag_start` (int, 0-based year index)
 and `diag_rate` ([hDS, hAG, 2, years]); `process_pjnz()` sets 0, zeros, the projection length (never) and zeros.
 Callers that build parameters without `process_pjnz()` must add all four.
 
@@ -70,6 +70,7 @@ Callers that build parameters without `process_pjnz()` must add all four.
 - **Row 5.** PAN, families 1-3, 5, 6, with the oracle's diagnosis rates (`l2_diag_rates` from the base run's ART
   coverage and Spectrum's stored diagnosis parameters): diagnosed total within 1.6e-14, reported new diagnoses within
   6.7e-16, largest absolute difference in any diagnosed cell 5.9e-13 persons.
+- **Row 4, 9 slots.** The DLL's detection loop reads 9 entries per sex while placement reads slots 1 - 8. Filling 15-19 ... 45-49 in slots 1 - 7, zero in slot 8 and the 50+ total in slot 9 (leapfrogfit `csavr_model_parameters()`; the caller's layout is inferred, SPECTRUM.exe is not decompiled): 50+ PLHIV within 1.7e-5 on EST (6 - 12 migrants a year at 50+), 1e-6 on GRC men and 3e-6 on IRL men, where placing the 50+ input was off by exactly that input; ISL (whose 2019 input is one man at 50 - 54) AIDS deaths 16% -> 0.9% and PRT (2000, 50+ only) PLHIV 7.3e-3 -> 6.2e-4 once such years count as migrant years. Files without migrant input are unchanged (PAN 2020 AIDS deaths equal to 10 digits). The patched eppasm oracle still takes 8 slots.
 - **Row 6.** Family 4 (r-logistic) on KGZ, ARM, MEX and URY, whose DPs set the PWID inputs: with the adjustment, the
   HIV+ stock went negative in KGZ's 1978 (an epidemic of about 10 people); without it, totals within 5e-15 and
   diagnosed cells within 7e-12 persons. The other 31 files were already exact for family 4.

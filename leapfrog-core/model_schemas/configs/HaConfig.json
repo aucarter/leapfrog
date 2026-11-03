@@ -202,7 +202,7 @@
     },
     "hiv_migrants": {
       "num_type": "real_type",
-      "dims": ["8", "SS::NS", "opts.proj_steps"],
+      "dims": ["9", "SS::NS", "opts.proj_steps"],
       "alias": {
         "r": "hivmigr"
       }
