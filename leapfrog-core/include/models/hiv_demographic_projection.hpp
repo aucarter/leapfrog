@@ -131,16 +131,18 @@ struct HivDemographicProjection<Config> {
     auto& i_dp = intermediate.dp;
     const auto& p_ha = pars.ha;
 
-    // csavr_dll_model = 1: in a year where Spectrum's HIV+ migrant input is
-    // non-zero anywhere, the CSAVR DLL replaces net migration x HIV+ population
-    // at ages 15+ by the input, spread evenly over the single ages of its 5-year
-    // group (15-19 for the 15-16 and 17-19 groups; 50+ over 50-80). HIV-negative
-    // people still migrate at the net rate, so the total population takes the
-    // input in place of the HIV+ share of net migration.
+    // csavr_dll_model = 1: in a year where any of the 9 slots of Spectrum's HIV+
+    // migrant input is non-zero, the CSAVR DLL replaces net migration x HIV+
+    // population at ages 15+ by the input, spread evenly over the single ages of
+    // a group: slot 0 for the 15-16 and 17-19 groups (input / 5 per age), slot
+    // ha - 1 for the others, so the 50+ group reads slot 7 and slot 8 only marks
+    // the year. HIV-negative people still
+    // migrate at the net rate, so the total population takes the input in place
+    // of the HIV+ share of net migration.
     bool hivmigr_on = false;
     if (p_ha.csavr_dll_model == 1) {
       for (int s = 0; s < NS; ++s)
-        for (int g = 0; g < 8; ++g)
+        for (int g = 0; g < 9; ++g)
           if (p_ha.hiv_migrants(g, s, t) != 0.0) hivmigr_on = true;
     }
 
