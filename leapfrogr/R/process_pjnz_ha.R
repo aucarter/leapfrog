@@ -263,6 +263,29 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     pwid_hivpos_nonaids_mortality <- -1
   }
 
+  # ART coverage by CD4 stage (<CD4Coverage MV2>, used when ARTCoverageSelection is 1), percent ->
+  # proportion, stages > 500 to < 50 as leapfrog's hDS. Rows after the tag: description, <Value>,
+  # the 7 stages, a blank row and a second block of 7. Spectrum 6.28 BRA 2023 applies the first
+  # block to both sexes and leaves the second empty; a file with the second block filled stops,
+  # since what it holds is not established.
+  art_cd4_coverage <- array(0, c(7L, 2L, proj_years_count))
+  if ("<CD4Coverage MV2>" %in% dat$dp_raw$Tag) {
+    i_cov <- which(dat$dp_raw[, 1] == "<CD4Coverage MV2>")
+    cols <- 3L + seq_len(proj_years_count)
+    read_block <- function(rows) {
+      x <- suppressWarnings(matrix(as.numeric(unlist(dat$dp_raw[rows, cols])), nrow = 7L))
+      x[is.na(x)] <- 0
+      x
+    }
+    block1 <- read_block(i_cov + 3:9)
+    block2 <- read_block(i_cov + 11:17)
+    if (identical(as.integer(art_coverage_selection), 1L) && any(block2 != 0)) {
+      stop("<CD4Coverage MV2> has values in its second block; leapfrog reads only the first")
+    }
+    art_cd4_coverage[, 1, ] <- block1 / 100
+    art_cd4_coverage[, 2, ] <- block1 / 100
+  }
+
   art_initiation_rate <- pars$art_initiation_rate
   if (is.null(pars$art_initiation_rate)) {
     art_initiation_rate <- array(0.0, c(2L, proj_years_count))
@@ -273,6 +296,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     incidinput = incidinput,
     art_entry_option = art_entry_option(art_coverage_selection),
     art_initiation_rate = art_initiation_rate,
+    art_cd4_coverage = art_cd4_coverage,
     transmission_rate_hts = transmission_rate_hts,
     initial_incidence = initial_incidence,
     epidemic_start_hts = epidemic_start_hts,
@@ -320,11 +344,11 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
 SPECTRUM_ART_SELECTION_TO_ENTRY_OPTION <- c(
   "0" = 0L,  # DP_NumOrPercent      number/percent on ART  -> ART_ENTRY_NUMBER_OR_PERCENT
   "5" = 1L,  # DP_ARTInitiationRate ART initiation rate    -> ART_ENTRY_INITIATION_RATE
-  "4" = 2L   # DP_PcntByRiskGrp     percent by risk group  -> ART_ENTRY_PERCENT_BY_RISK_GROUP
+  "4" = 2L,  # DP_PcntByRiskGrp     percent by risk group  -> ART_ENTRY_PERCENT_BY_RISK_GROUP
+  "1" = 3L   # DP_CD4Percent        percent by CD4         -> ART_ENTRY_PERCENT_BY_CD4
 )
 
 UNSUPPORTED_ART_SELECTIONS <- c(
-  "1" = "percent by CD4",         # DP_CD4Percent
   "2" = "number by CD4",          # DP_CD4Number
   "3" = "number of new patients"  # DP_NumNewARTPats
 )

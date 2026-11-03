@@ -170,6 +170,8 @@ type
     artEntryOptionLength: Integer;
     artInitiationRate: PDouble;
     artInitiationRateLength: Integer;
+    artCd4Coverage: PDouble;
+    artCd4CoverageLength: Integer;
 end;
 
 type
@@ -219,6 +221,7 @@ type
     pwidSexRatio: TGBFixedArray<Double>;
     artEntryOption: Integer;
     artInitiationRate: TGBFixedArray<Double>;
+    artCd4Coverage: TGBFixedArray<Double>;
     function getView(): LeapfrogHivAdultParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1170,6 +1173,7 @@ begin;
   pwidPropHivpop.Free;
   pwidSexRatio.Free;
   artInitiationRate.Free;
+  artCd4Coverage.Free;
   inherited;
 end;
 
@@ -1287,6 +1291,8 @@ begin;
   Result.artEntryOptionLength := 1;
   Result.artInitiationRate := PDouble(artInitiationRate.data);
   Result.artInitiationRateLength := artInitiationRate.GetLength();
+  Result.artCd4Coverage := PDouble(artCd4Coverage.data);
+  Result.artCd4CoverageLength := artCd4Coverage.GetLength();
 end;
 
 function LeapfrogHivAdultState.getView(): LeapfrogHivAdultStateView;
@@ -2033,6 +2039,7 @@ begin;
   pwidPropHivpop.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'pwidPropHivpop');
   pwidSexRatio.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'pwidSexRatio');
   artInitiationRate.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'artInitiationRate');
+  artCd4Coverage.WriteToDisk(IncludeTrailingPathDelimiter(dir) +  'artCd4Coverage');
 end;
 
 procedure LeapfrogHivAdultState.writeToDisk(dir: string);
