@@ -202,6 +202,12 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   } else {
     1L
   }
+  # pjnz 0.0.6 does not parse <ARTCoverageSelection MV> (NULL on every file), which made
+  # art_entry_option() default to number/percent without checking the selection
+  art_coverage_selection <- pars$art_coverage_selection
+  if (is.null(art_coverage_selection) && "<ARTCoverageSelection MV>" %in% dat$dp_raw$Tag) {
+    art_coverage_selection <- dat$dp_raw[which(dat$dp_raw[, 1] == "<ARTCoverageSelection MV>") + 2, 4]
+  }
 
   p_ag_15to49 <- 35L
   p_ag_15plus <- 66L
@@ -265,7 +271,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   list(
     incidence_model_choice = incidence_model_choice,
     incidinput = incidinput,
-    art_entry_option = art_entry_option(pars$art_coverage_selection),
+    art_entry_option = art_entry_option(art_coverage_selection),
     art_initiation_rate = art_initiation_rate,
     transmission_rate_hts = transmission_rate_hts,
     initial_incidence = initial_incidence,
