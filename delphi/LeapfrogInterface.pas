@@ -138,6 +138,8 @@ type
     eppFixBugsLength: Integer;
     csavrDllModel: Integer;
     csavrDllModelLength: Integer;
+    initiationAllocationMethod: Integer;
+    initiationAllocationMethodLength: Integer;
     hivMigrants: PDouble;
     hivMigrantsLength: Integer;
     diagStart: Integer;
@@ -201,6 +203,7 @@ type
     eppAgeModel: Integer;
     eppFixBugs: Integer;
     csavrDllModel: Integer;
+    initiationAllocationMethod: Integer;
     hivMigrants: TGBFixedArray<Double>;
     diagStart: Integer;
     diagRate: TGBFixedArray<Double>;
@@ -1252,6 +1255,8 @@ begin;
   Result.eppFixBugsLength := 1;
   Result.csavrDllModel := csavrDllModel;
   Result.csavrDllModelLength := 1;
+  Result.initiationAllocationMethod := initiationAllocationMethod;
+  Result.initiationAllocationMethodLength := 1;
   Result.hivMigrants := PDouble(hivMigrants.data);
   Result.hivMigrantsLength := hivMigrants.GetLength();
   Result.diagStart := diagStart;

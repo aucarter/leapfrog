@@ -200,6 +200,12 @@
         "r": "csavr_dll_model"
       }
     },
+    "initiation_allocation_method": {
+      "num_type": "int",
+      "alias": {
+        "r": "art_alloc_method"
+      }
+    },
     "hiv_migrants": {
       "num_type": "real_type",
       "dims": ["9", "SS::NS", "opts.proj_steps"],

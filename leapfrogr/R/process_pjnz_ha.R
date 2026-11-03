@@ -195,6 +195,13 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   art15plus_num[art15plus_isperc] <- art15plus_num[art15plus_isperc] / 100
 
   art_alloc_mxweight <- pars$new_art_pat_alloc[1]
+  # NewARTPatAllocationMethod: 4 is lowest CD4 first, any other value the weighted mix; 1 when
+  # absent, as EPP's SpectrumParser and eppasm read it
+  art_alloc_method <- if ("<NewARTPatAllocationMethod MV2>" %in% dat$dp_raw$Tag) {
+    as.integer(dat$dp_raw[which(dat$dp_raw[, 1] == "<NewARTPatAllocationMethod MV2>") + 2, 4])
+  } else {
+    1L
+  }
 
   p_ag_15to49 <- 35L
   p_ag_15plus <- 66L
@@ -280,6 +287,7 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     art15plus_num = art15plus_num,
     art15plus_isperc = art15plus_isperc,
     art_alloc_mxweight = art_alloc_mxweight,
+    art_alloc_method = art_alloc_method,
     epp_age_model = 0L,
     epp_fix_bugs = 0L,
     csavr_dll_model = 0L,
