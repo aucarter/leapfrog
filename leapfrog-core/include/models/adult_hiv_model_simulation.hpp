@@ -952,9 +952,9 @@ struct AdultHivModelSimulation<Config> {
   // option has been checked. Each stage initiates its shortfall; within the
   // stage everyone untreated is eligible, so the age allocation weights by the
   // untreated population. Stages without coverage initiate no one: special
-  // populations eligible regardless of CD4 are not given a coverage here (BRA's
-  // adults on ART above CD4 250 are within 3% of Spectrum's without it; most
-  // are children on ART reaching 15).
+  // populations eligible regardless of CD4 are not given a coverage here. BRA's
+  // adults on ART above CD4 250 are still within 4% of Spectrum's, all of them
+  // children on ART reaching 15.
   void calc_artinit_from_percent_by_cd4(int s) {
     const auto& p_ha = pars.ha;
     const auto& n_ha = state_next.ha;
