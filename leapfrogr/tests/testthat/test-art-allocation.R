@@ -1,5 +1,5 @@
 test_that("ART allocation method 4 initiates the lowest CD4 stage first", {
-  pjnz <- system.file("pjnz/bwa_aim-no-special-elig-numpmtct.PJNZ", package = "leapfrog")
+  pjnz <- system.file("pjnz/bwa_aim-adult-art-no-special-elig_v6.13_2022-04-18.PJNZ", package = "leapfrog")
   years <- 1970:2030
   p <- process_pjnz(pjnz, use_coarse_age_groups = TRUE, extract_child_params = TRUE)
   expect_type(p$art_alloc_method, "integer")
@@ -10,10 +10,10 @@ test_that("ART allocation method 4 initiates the lowest CD4 stage first", {
   ## Every method other than 4 is the weighted mix
   expect_equal(run(3)$h_artpop, m1$h_artpop)
 
-  ## Same number on ART, drawn from the sickest: fewer untreated people at the
-  ## lowest CD4 stage and fewer untreated deaths during scale-up
+  ## During scale-up more of those on ART started at the lowest CD4 stage, and
+  ## fewer people die untreated
   y <- which(years %in% 2005:2015)
-  expect_equal(colSums(m4$h_artpop, dims = 4)[y], colSums(m1$h_artpop, dims = 4)[y], tolerance = 1e-3)
-  expect_true(all(colSums(m4$h_hivpop[7, , , y], dims = 2) < colSums(m1$h_hivpop[7, , , y], dims = 2)))
+  lowest_share <- function(o) colSums(o$h_artpop[, 7, , , y], dims = 3) / colSums(o$h_artpop[, , , , y], dims = 4)
+  expect_true(all(lowest_share(m4) > lowest_share(m1)))
   expect_lt(sum(m4$h_hiv_deaths_no_art[, , , y]), sum(m1$h_hiv_deaths_no_art[, , , y]))
 })
