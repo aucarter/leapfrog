@@ -121,8 +121,11 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     as.numeric(sub(".*Beta ([0-9]+)$", "\\1", vers_str)),
     NA
   )
+  ## Off-ART CD4 mortality scaling arrived in Spectrum 5.73 beta 15, so the beta number gates only 5.73 itself:
+  ## a later beta (2026 BGD, "6.29 Beta 11") scales. Gating every beta, as eppasm's reader does, left BGD's
+  ## off-ART mortality 3% (2006) to 25% (2020) above Spectrum's, uniformly over age.
   scale_cd4_mort <- ifelse(
-    version >= 5.73 && (beta_version >= 15 || is.na(beta_version)),
+    version > 5.73 || (version == 5.73 && (is.na(beta_version) || beta_version >= 15)),
     1L,
     0L
   )
