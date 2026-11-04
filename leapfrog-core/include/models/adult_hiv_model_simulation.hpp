@@ -1156,7 +1156,12 @@ struct AdultHivModelSimulation<Config> {
                                    i_ha.artelig_hm(hm);
           artinit_hahm = std::min(artinit_hahm, i_ha.artelig_hahm(hm, ha - hIDX_15PLUS));
           const real_type grad_in = i_ha.grad(hm, ha, s) + (epp ? i_ha.grad_infections(hm, ha, s) : 0.0);
-          artinit_hahm = std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * grad_in);
+          // Spectrum floors a cell's initiations at 0 and caps them at its
+          // start-of-step untreated, not the untreated after this step's deaths: with the latter, THA's slightly
+          // negative on-ART cells from 15-year-old entrants got scaled-up off-ART deaths, a negative cap, and negative
+          // initiations that grew them (men aged 16 in 2006: -66 on ART vs Spectrum's 13). EPP keeps its own cap.
+          artinit_hahm = epp ? std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * grad_in) :
+                               std::min(std::max(artinit_hahm, 0.0), n_ha.h_hivpop(hm, ha, s));
           i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
           i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
