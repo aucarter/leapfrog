@@ -174,6 +174,8 @@ type
     artCd4CoverageLength: Integer;
     hivMigrantsByAge: PDouble;
     hivMigrantsByAgeLength: Integer;
+    artPctNeedStartYear: Integer;
+    artPctNeedStartYearLength: Integer;
 end;
 
 type
@@ -225,6 +227,7 @@ type
     artInitiationRate: TGBFixedArray<Double>;
     artCd4Coverage: TGBFixedArray<Double>;
     hivMigrantsByAge: TGBFixedArray<Double>;
+    artPctNeedStartYear: Integer;
     function getView(): LeapfrogHivAdultParamsView;
     procedure writeToDisk(dir: string);
     Destructor Destroy; override;
@@ -1299,6 +1302,8 @@ begin;
   Result.artCd4CoverageLength := artCd4Coverage.GetLength();
   Result.hivMigrantsByAge := PDouble(hivMigrantsByAge.data);
   Result.hivMigrantsByAgeLength := hivMigrantsByAge.GetLength();
+  Result.artPctNeedStartYear := artPctNeedStartYear;
+  Result.artPctNeedStartYearLength := 1;
 end;
 
 function LeapfrogHivAdultState.getView(): LeapfrogHivAdultStateView;

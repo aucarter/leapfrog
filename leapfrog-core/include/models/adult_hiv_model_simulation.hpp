@@ -725,6 +725,7 @@ struct AdultHivModelSimulation<Config> {
 
     for (int s = 0; s < NS; ++s) {
       calc_art_eligibility(s);
+      if (hiv_step == 0) calc_art_need_start_year(s);
 
       // How many people we aim to put on ART this time step.
       // There are 3 ART entry options at the moment
@@ -852,6 +853,32 @@ struct AdultHivModelSimulation<Config> {
     }
   };
 
+  // Spectrum's adult need for ART in year t (ARTCalc "Total Need for ART 15
+  // Plus"), the denominator AIM converts a percent target with: on ART plus the
+  // eligible untreated (special populations and pregnant women included), 15+,
+  // from the population after the year's ageing and non-HIV deaths and before
+  // its first HIV time step, so none of the year's new infections, progression
+  // or ART initiation, as Spectrum 2026 sums it: before
+  // running year t's ART it sums state[t] into the need
+  // (ARTCalc field 2, by sex), then converts the year t - 1 and year t inputs
+  // with that one need. CAN 2030 (95% for both sexes): stored ART over stored
+  // need is 95.000%. Called at hiv_step 0, before this step's gradients are
+  // applied to h_hivpop and h_artpop.
+  void calc_art_need_start_year(int s) {
+    const auto& n_ha = state_next.ha;
+    auto& i_ha = intermediate.ha;
+
+    real_type on_art = 0.0;
+    for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
+      for (int hm = 0; hm < hDS; ++hm) {
+        for (int hu = 0; hu < hTS; ++hu) {
+          on_art += n_ha.h_artpop(hu, hm, ha, s);
+        }
+      }
+    }
+    i_ha.art_need_start_year(s) = on_art + i_ha.Xartelig_15plus;
+  };
+
   // ART entry option ART_ENTRY_INITIATION_RATE: initiations are a rate applied
   // to the treatment gap (PLHIV, plus this year's new infections, minus those
   // already on ART). Everything is read from the start-of-year state, matching
@@ -915,7 +942,17 @@ struct AdultHivModelSimulation<Config> {
         art_interp_w -= 0.5;
       }
 
-      if (!p_ha.adults_on_art_is_percent(s, t - 1) && !p_ha.adults_on_art_is_percent(s, t)) {
+      if (p_ha.art_pct_need_start_year == 1 && !art_midyear) {
+        // Spectrum AIM: each year-end input that is a percent becomes a number
+        // with this year's start-of-year need (calc_art_need_start_year), and
+        // the two numbers are interpolated as numbers
+        const real_type need = i_ha.art_need_start_year(s);
+        const real_type num_prev = p_ha.adults_on_art_is_percent(s, t - 1) ?
+          p_ha.adults_on_art(s, t - 1) * need : p_ha.adults_on_art(s, t - 1);
+        const real_type num_curr = p_ha.adults_on_art_is_percent(s, t) ?
+          p_ha.adults_on_art(s, t) * need : p_ha.adults_on_art(s, t);
+        artnum_hts = (1.0 - art_interp_w) * num_prev + art_interp_w * num_curr;
+      } else if (!p_ha.adults_on_art_is_percent(s, t - 1) && !p_ha.adults_on_art_is_percent(s, t)) {
         // case: both values are numbers
         artnum_hts = (1.0 - art_interp_w) * p_ha.adults_on_art(s, t - 1) +
                      art_interp_w * p_ha.adults_on_art(s, t);
