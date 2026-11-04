@@ -149,7 +149,7 @@ struct HivDemographicProjection<Config> {
     bool hivmigr_input_on = false;
     if (p_ha.csavr_dll_model != 1) {
       for (int s = 0; s < NS; ++s)
-        for (int a = p_idx_hiv_first_adult; a < pAG; ++a)
+        for (int a = 0; a < pAG; ++a)
           if (p_ha.hiv_migrants_by_age(a, s, t) != 0.0) hivmigr_input_on = true;
     }
 
@@ -165,9 +165,17 @@ struct HivDemographicProjection<Config> {
       // equal it in every such year, and take the default in every other year,
       // in the 2026 NPL, NLD, CYP, DEU, PAK, PHL and THA files. As in the CSAVR
       // DLL, migrants take their age group's CD4 and ART mix; a group with no
-      // HIV+ people takes none, so it stays empty.
+      // HIV+ people takes none, so it stays empty. The year switch covers every
+      // age, children included: in 2026 AUS, years whose only non-zero entries
+      // are at ages 0-14 store exactly those child migrants and none at 15+.
+      // Children take the input by single age, with the same empty-age rule.
       if (p_ha.csavr_dll_model != 1 && hivmigr_input_on) {
         auto& n_dp = state_next.dp;
+        for (int a = 0; a < p_idx_hiv_first_adult; ++a) {
+          const real_type mig = n_ha.p_hivpop(a, s) > 0.0 ? p_ha.hiv_migrants_by_age(a, s, t) : 0.0;
+          n_dp.p_totpop(a, s) += mig - n_ha.p_net_migration_hivpop(a, s);
+          n_ha.p_net_migration_hivpop(a, s) = mig;
+        }
         int a = p_idx_hiv_first_adult;
         for (int ha = 0; ha < hAG; ++ha) {
           real_type hivpop_ha = 0.0;
