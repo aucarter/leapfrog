@@ -257,6 +257,13 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
   if (!is.null(pars$pwid_hivpos_nonaids_mortality) && !is.na(pars$pwid_hivpos_nonaids_mortality[1])) {
     # <EPPIDUMortality MV> is a percent per year (EPP's 15-49 model divides it by 100); the engine reads a rate
     pwid_hivpos_nonaids_mortality <- pars$pwid_hivpos_nonaids_mortality[1] / 100
+    # <SexRatioFromEPP MV> is a switch (1 in every 2026 AEM file), not the ratio. Spectrum applies the first
+    # epidemic's row of <EPPSexRatio MV>: 0 in the 2026 AEM files, so every PWID death falls on men (MYS, VNM:
+    # Spectrum's implied female PWID deaths are 0, male within 1% of leapfrog's with this row)
+    if ("<EPPSexRatio MV>" %in% dat$dp_raw$Tag) {
+      epp_sex_ratio_idx <- which(dat$dp_raw[, 1] == "<EPPSexRatio MV>")
+      pars$pwid_sex_ratio <- as.numeric(unlist(dat$dp_raw[epp_sex_ratio_idx + 3, time_idx]))
+    }
     if (length(pars$pwid_sex_ratio) < proj_years_count) {
       pwid_sex_ratio <- rep(pars$pwid_sex_ratio, proj_years_count)
     } else {
