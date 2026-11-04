@@ -42,7 +42,7 @@
     },
     "sr_hc_art_init_replay": {
       "num_type": "real_type",
-      "dims": ["SS::hcAG_coarse", "opts.proj_steps"]
+      "dims": ["SS::hcAG_c", "opts.proj_steps"]
     },
     "sr_art_init_replay": {
       "num_type": "real_type",
@@ -69,7 +69,7 @@
     },
     "sr_hc_art_init_rate": {
       "num_type": "real_type",
-      "dims": ["SS::hcAG_coarse"]
+      "dims": ["SS::hcAG_c"]
     },
     "sr_art_init_hts": {
       "num_type": "real_type",
