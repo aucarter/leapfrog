@@ -1159,9 +1159,12 @@ struct AdultHivModelSimulation<Config> {
           // Spectrum floors a cell's initiations at 0 and caps them at its
           // start-of-step untreated, not the untreated after this step's deaths: with the latter, THA's slightly
           // negative on-ART cells from 15-year-old entrants got scaled-up off-ART deaths, a negative cap, and negative
-          // initiations that grew them (men aged 16 in 2006: -66 on ART vs Spectrum's 13). EPP keeps its own cap.
-          artinit_hahm = epp ? std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * grad_in) :
-                               std::min(std::max(artinit_hahm, 0.0), n_ha.h_hivpop(hm, ha, s));
+          // initiations that grew them (men aged 16 in 2006: -66 on ART vs Spectrum's 13). EPP keeps its own cap, and so
+          // does percent by CD4, which Spectrum runs in a separate block without it and whose target is
+          // the stage's end-of-step untreated (BRA untreated 0.02% -> 1.07% with the start-of-step cap).
+          const bool spectrum_cap = !epp && p_ha.art_entry_option != SS::ART_ENTRY_PERCENT_BY_CD4;
+          artinit_hahm = spectrum_cap ? std::min(std::max(artinit_hahm, 0.0), n_ha.h_hivpop(hm, ha, s)) :
+                                        std::min(artinit_hahm, n_ha.h_hivpop(hm, ha, s) + opts.dt * grad_in);
           i_ha.grad(hm, ha, s) -= artinit_hahm / opts.dt;
           i_ha.gradART(ART0MOS, hm, ha, s) += artinit_hahm / opts.dt;
           n_ha.h_art_initiation(hm, ha, s) += artinit_hahm;
