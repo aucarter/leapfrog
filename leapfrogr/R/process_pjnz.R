@@ -27,6 +27,7 @@ process_pjnz <- function(
   dim_vars <- dat$dim_vars
 
   pars <- lapply(dat$data, `[[`, "data")
+  pars$country_code <- read_pjn_country_code(pjnz)
 
   dp_params <- process_pjnz_dp(dat, pars, dim_vars)
   ha_params <- process_pjnz_ha(dat, pars, dim_vars, use_coarse_age_groups)
@@ -36,4 +37,16 @@ process_pjnz <- function(
     hc_params <- list()
   }
   c(dp_params, ha_params, hc_params)
+}
+
+## ISO numeric country code from the PJN's "Country Code" row (NA if absent)
+read_pjn_country_code <- function(pjnz) {
+  pjn <- grep("\\.PJN$", utils::unzip(pjnz, list = TRUE)$Name, ignore.case = TRUE, value = TRUE)
+  if (length(pjn) != 1) return(NA_integer_)
+  con <- unz(pjnz, pjn)
+  on.exit(close(con))
+  rows <- strsplit(readLines(con, warn = FALSE, encoding = "latin1"), ",")
+  i <- which(vapply(rows, function(r) length(r) > 1 && r[2] == "Country Code", logical(1)))
+  if (length(i) != 1) return(NA_integer_)
+  suppressWarnings(as.integer(rows[[i + 1]][4]))
 }

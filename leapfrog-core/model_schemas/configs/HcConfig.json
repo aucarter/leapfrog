@@ -235,6 +235,10 @@
         "num_type": "real_type",
         "dims": ["3"]
       },
+      "hc_noart_mort_mult": {
+        "num_type": "real_type",
+        "dims": ["2", "opts.proj_steps"]
+      },
       "hc_art_start": {
         "num_type": "int"
       },

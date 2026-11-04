@@ -495,6 +495,14 @@ process_pjnz_hc <- function(dat, pars, dim_vars, dp_params, use_coarse_age_group
   }
   cotrim_effect <- prepare_cotrim_effect(dat, pars, dim_vars)
 
+  ## Spectrum multiplies off-ART child mortality by <ChildMortalityRates MV2> only when the country code is 710
+  ## (South Africa); every other file gets 1 whatever the tag holds (SPECTRUM.exe 2026, FUN_019c67f8). Rows 3 and 4
+  ## are taken for ages 0-4 and 5-14, from the getter's index (2, age group); the 2026 ZAF file's four rows are equal.
+  hc_noart_mort_mult <- matrix(1, nrow = 2L, ncol = length(proj_years))
+  if (isTRUE(pars$country_code == 710L) && !is.null(pars$child_mortality_rates)) {
+    hc_noart_mort_mult[] <- unname(as.matrix(pars$child_mortality_rates)[3:4, seq_along(proj_years)])
+  }
+
   ## ART coverage
   art <- pars$child_treat_inputs
   hc_art_is_age_spec <- unname(art[c("ART: 0-14y"), ] == -9999)
@@ -554,6 +562,7 @@ process_pjnz_hc <- function(dat, pars, dim_vars, dp_params, use_coarse_age_group
     fert_hivnpop = fert_hivnpop,
     total_births = total_births,
     cotrim_effect = cotrim_effect,
+    hc_noart_mort_mult = hc_noart_mort_mult,
     hc_art_start = hc_art_start,
     hc_age_specific_fertility_rate = hc_age_specific_fertility_rate
   ))
