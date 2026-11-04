@@ -956,8 +956,11 @@ struct AdultHivModelSimulation<Config> {
         // with this year's start-of-year need (calc_art_need_start_year), and
         // the two numbers are interpolated as numbers
         const real_type need = i_ha.art_need_start_year(s);
+        // A mid-year file's number year ends at the mean of its two inputs, so a percent year after one starts there
         const real_type num_prev = p_ha.adults_on_art_is_percent(s, t - 1) ?
-          p_ha.adults_on_art(s, t - 1) * need : p_ha.adults_on_art(s, t - 1);
+          p_ha.adults_on_art(s, t - 1) * need :
+          (pct_own_year && t >= 2 && !p_ha.adults_on_art_is_percent(s, t - 2) ?
+             0.5 * (p_ha.adults_on_art(s, t - 2) + p_ha.adults_on_art(s, t - 1)) : p_ha.adults_on_art(s, t - 1));
         const real_type num_curr = p_ha.adults_on_art_is_percent(s, t) ?
           p_ha.adults_on_art(s, t) * need : p_ha.adults_on_art(s, t);
         artnum_hts = (1.0 - art_interp_w) * num_prev + art_interp_w * num_curr;
