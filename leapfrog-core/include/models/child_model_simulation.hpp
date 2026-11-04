@@ -179,10 +179,19 @@ struct ChildModelSimulation<Config> {
   // stored artpop can still be negative. Without the floor, THA's negative on-ART strata of 2000 (on-ART mortality
   // 2.357/yr) carried into 2001, lowered the on-ART count the initiations are computed from, and diverged from
   // Spectrum. Age 5, reached through the hc1 -> hc2 CD4 remap, is not floored: no floor is visible in that block.
+  // Spectrum's HIV+ by age is the sum of its strata, so what the floor adds is added to p_hivpop (already aged by
+  // the HIV demographic projection) to keep the two consistent.
   void run_child_ageing() {
     const auto& p_dp = pars.dp;
     const auto& c_hc = state_curr.hc;
     auto& n_hc = state_next.hc;
+    auto& n_ha = state_next.ha;
+    const auto floor_at_zero = [&n_ha](real_type& x, int a, int s) {
+      if (x < 0.0) {
+        n_ha.p_hivpop(a, s) -= x;
+        x = 0.0;
+      }
+    };
 
     for (int s = 0; s < NS; ++s) {
       // less than 5 because there is a cd4 transition between ages 4 and 5
@@ -190,13 +199,13 @@ struct ChildModelSimulation<Config> {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc1DS; ++hd) {
             n_hc.hc1_hivpop(hd, cat, a, s) += c_hc.hc1_hivpop(hd, cat, a - 1, s) * p_dp.survival_probability(a, s, t);
-            n_hc.hc1_hivpop(hd, cat, a, s) = std::max(n_hc.hc1_hivpop(hd, cat, a, s), 0.0);
+            floor_at_zero(n_hc.hc1_hivpop(hd, cat, a, s), a, s);
           }
         }
         for (int hd = 0; hd < hc1DS; ++hd) {
           for (int dur = 0; dur < hTS; ++dur) {
             n_hc.hc1_artpop(dur, hd, a, s) += c_hc.hc1_artpop(dur, hd, a - 1, s) * p_dp.survival_probability(a, s, t);
-            n_hc.hc1_artpop(dur, hd, a, s) = std::max(n_hc.hc1_artpop(dur, hd, a, s), 0.0);
+            floor_at_zero(n_hc.hc1_artpop(dur, hd, a, s), a, s);
           }
         }
       }
@@ -227,14 +236,14 @@ struct ChildModelSimulation<Config> {
           for (int hd = 0; hd < hc2DS; ++hd) {
             n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) += c_hc.hc2_hivpop(hd, cat, a - hc2_agestart - 1, s) *
                                                               p_dp.survival_probability(a, s, t);
-            n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) = std::max(n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s), 0.0);
+            floor_at_zero(n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s), a, s);
           }
         }
         for (int hd = 0; hd < hc2DS; ++hd) {
           for (int dur = 0; dur < hTS; ++dur) {
             n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s) += c_hc.hc2_artpop(dur, hd, a - hc2_agestart - 1, s) *
                                                               p_dp.survival_probability(a, s, t);
-            n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s) = std::max(n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s), 0.0);
+            floor_at_zero(n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s), a, s);
           }
         }
       }
