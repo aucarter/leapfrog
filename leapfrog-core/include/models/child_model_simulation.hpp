@@ -965,6 +965,8 @@ struct ChildModelSimulation<Config> {
     }
   };
 
+  // Off-ART child mortality carries hc_noart_mort_mult (row 0: ages 0-4, row 1: 5-14) in both the deaths and the
+  // mid-year population that CD4 progression uses, as Spectrum's AIM step does (2026)
   void cd4_mortality() {
     const auto& p_hc = pars.hc;
     auto& n_hc = state_next.hc;
@@ -977,7 +979,8 @@ struct ChildModelSimulation<Config> {
       for (int a = 0; a < hc2_agestart; ++a) {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc1DS; ++hd) {
-            auto hiv_deaths_strat = i_hc.cotrim_mean(art_flag) * n_hc.hc1_hivpop(hd, cat, a, s) * p_hc.hc1_cd4_mort(hd, cat, a);
+            auto hiv_deaths_strat = i_hc.cotrim_mean(art_flag) * n_hc.hc1_hivpop(hd, cat, a, s) * p_hc.hc1_cd4_mort(hd, cat, a) *
+                                    p_hc.hc_noart_mort_mult(0, t);
             i_hc.hc_posthivmort(hd, cat, a, s) = n_hc.hc1_hivpop(hd, cat, a, s) - hiv_deaths_strat;
           }
         }
@@ -989,7 +992,7 @@ struct ChildModelSimulation<Config> {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc2DS; ++hd) {
             auto hiv_deaths_strat = i_hc.cotrim_mean(art_flag) * n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) *
-                                    p_hc.hc2_cd4_mort(hd, cat, a - hc2_agestart);
+                                    p_hc.hc2_cd4_mort(hd, cat, a - hc2_agestart) * p_hc.hc_noart_mort_mult(1, t);
             i_hc.hc_posthivmort(hd, cat, a, s) = n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) -
                                                 hiv_deaths_strat;
           }
@@ -1040,7 +1043,7 @@ struct ChildModelSimulation<Config> {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc1DS; ++hd) {
             auto cd4_deaths_grad = i_hc.cotrim_mean(art_flag) * n_hc.hc1_hivpop(hd, cat, a, s) *
-                                   p_hc.hc1_cd4_mort(hd, cat, a);
+                                   p_hc.hc1_cd4_mort(hd, cat, a) * p_hc.hc_noart_mort_mult(0, t);
             i_hc.hc_grad(hd, cat, a, s) -= cd4_deaths_grad;
             n_hc.hc1_noart_aids_deaths(hd, cat, a, s) += cd4_deaths_grad;
           }
@@ -1054,7 +1057,7 @@ struct ChildModelSimulation<Config> {
           for (int hd = 0; hd < hc2DS; ++hd) {
             auto cd4_mort_grad = i_hc.cotrim_mean(art_flag) *
                                  n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) *
-                                 p_hc.hc2_cd4_mort(hd, cat, a - hc2_agestart);
+                                 p_hc.hc2_cd4_mort(hd, cat, a - hc2_agestart) * p_hc.hc_noart_mort_mult(1, t);
             i_hc.hc_grad(hd, cat, a, s) -= cd4_mort_grad;
             n_hc.hc2_noart_aids_deaths(hd, cat, a - hc2_agestart, s) += cd4_mort_grad;
           }
