@@ -64,8 +64,14 @@ prepare_abortion_input <- function(dat, pars, dim_vars, proj_years) {
   abortion <- array(
     0, dim = c(2, length(proj_years)), dimnames = list(value = c("Input", "Percent"), year = proj_years)
   )
+  ## <PregTermAbortion MV3> is a number of terminations, or a percent of HIV+ pregnancies where
+  ## <PregTermAbortionPerNum MV2> is 1 ("Percent of pregnancies to HIV+ women terminated by abortion");
+  ## the engine takes the percent case as a proportion. The 2026 KHM file (10%) then matches Spectrum's
+  ## HIV+ children to the unit through 2002; read as 10, its HIV births were -9 times their value.
   abortion["Input", ] <- pars$preg_term_abortion
   abortion["Percent", ] <- pars$preg_term_abortion_pernum
+  is_pct <- abortion["Percent", ] == 1
+  abortion["Input", is_pct] <- abortion["Input", is_pct] / 100
   abortion
 }
 
