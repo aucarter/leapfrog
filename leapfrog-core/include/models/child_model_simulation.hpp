@@ -174,6 +174,11 @@ struct ChildModelSimulation<Config> {
 
   // private methods that we don't want people to call
   private:
+  // Spectrum's ageing sets every child stratum that comes out negative to 0, untreated and on ART alike, at ages
+  // 1-4 and 6-14 (Spectrum 2026), after its output is stored, so its
+  // stored artpop can still be negative. Without the floor, THA's negative on-ART strata of 2000 (on-ART mortality
+  // 2.357/yr) carried into 2001, lowered the on-ART count the initiations are computed from, and diverged from
+  // Spectrum. Age 5, reached through the hc1 -> hc2 CD4 remap, is not floored: no floor is visible in that block.
   void run_child_ageing() {
     const auto& p_dp = pars.dp;
     const auto& c_hc = state_curr.hc;
@@ -185,11 +190,13 @@ struct ChildModelSimulation<Config> {
         for (int cat = 0; cat < hcTT; ++cat) {
           for (int hd = 0; hd < hc1DS; ++hd) {
             n_hc.hc1_hivpop(hd, cat, a, s) += c_hc.hc1_hivpop(hd, cat, a - 1, s) * p_dp.survival_probability(a, s, t);
+            n_hc.hc1_hivpop(hd, cat, a, s) = std::max(n_hc.hc1_hivpop(hd, cat, a, s), 0.0);
           }
         }
         for (int hd = 0; hd < hc1DS; ++hd) {
           for (int dur = 0; dur < hTS; ++dur) {
             n_hc.hc1_artpop(dur, hd, a, s) += c_hc.hc1_artpop(dur, hd, a - 1, s) * p_dp.survival_probability(a, s, t);
+            n_hc.hc1_artpop(dur, hd, a, s) = std::max(n_hc.hc1_artpop(dur, hd, a, s), 0.0);
           }
         }
       }
@@ -220,12 +227,14 @@ struct ChildModelSimulation<Config> {
           for (int hd = 0; hd < hc2DS; ++hd) {
             n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) += c_hc.hc2_hivpop(hd, cat, a - hc2_agestart - 1, s) *
                                                               p_dp.survival_probability(a, s, t);
+            n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s) = std::max(n_hc.hc2_hivpop(hd, cat, a - hc2_agestart, s), 0.0);
           }
         }
         for (int hd = 0; hd < hc2DS; ++hd) {
           for (int dur = 0; dur < hTS; ++dur) {
             n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s) += c_hc.hc2_artpop(dur, hd, a - hc2_agestart - 1, s) *
                                                               p_dp.survival_probability(a, s, t);
+            n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s) = std::max(n_hc.hc2_artpop(dur, hd, a - hc2_agestart, s), 0.0);
           }
         }
       }
