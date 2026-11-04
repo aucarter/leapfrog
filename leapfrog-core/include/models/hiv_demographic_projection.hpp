@@ -691,6 +691,14 @@ struct HivDemographicProjection<Config> {
           migrants * (1.0 - pregprev_lag * p_en.entrant_net_migration_hiv_prob) +
           hivp_entrants;
       }
+      // The age-15 background deaths were booked on the cohort before it was
+      // replaced; EPP's age model books them on the entrants (natdeaths after
+      // the entrants are built), so they move with the change in the cohort.
+      // Reporting only: the replaced cohort has already survived the year.
+      if (surv15 > 0.0) {
+        n_dp.p_deaths_background_totpop(a0, s) +=
+          (n_dp.p_totpop(a0, s) - pop15) * (1.0 - surv15) / surv15;
+      }
       // This year's births were taken from the age-15 women before they were
       // replaced; EPP's age model and eppasm take them after (births_by_ha
       // follows the entrants), so births and the age-0 cohort move with the
