@@ -339,6 +339,10 @@ process_pjnz_ha <- function(dat, pars, dim_vars, use_coarse_age_groups = FALSE) 
     epp_age_model = 0L,
     epp_fix_bugs = 0L,
     csavr_dll_model = 0L,
+    # 1 converts percent ART targets with Spectrum's start-of-year need, as the
+    # AIM projection that produced the file's stored output does; 0 keeps the
+    # running treatment gap of leapfrog and eppasm
+    art_pct_need_start_year = 0L,
     hivmigr = array(0, c(9L, 2L, proj_years_count)),
     diag_start = proj_years_count,
     diag_rate = array(0, c(dim(cd4_mort)[1:2], 2L, proj_years_count)),
