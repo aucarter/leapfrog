@@ -167,8 +167,12 @@ prepare_pmtct_dropout <- function(dat, pars, dim_vars, proj_years) {
   pmtct_options <- c("Option A", "Option B", "Single dose nevirapine",
                      "WHO 2006 dual ARV regimen", "ART: Started before pregnancy",
                      "ART: Started during pregnancy >4 weeks", "ART: Started during pregnancy <4 weeks")
+  ## Spectrum 2026 applies the monthly ART breastfeeding dropout to every regimen, single-dose nevirapine and dual ARV
+  ## included; with it THA and KHM child infections in their sdNVP / dual years match to 0.1
   pmtct_dropout_eligible <- c("Option A",
                               "Option B",
+                              "Single dose nevirapine",
+                              "WHO 2006 dual ARV regimen",
                               "ART: Started before pregnancy",
                               "ART: Started during pregnancy >4 weeks",
                               "ART: Started during pregnancy <4 weeks")
@@ -188,9 +192,9 @@ prepare_pmtct_dropout <- function(dat, pars, dim_vars, proj_years) {
     pmtct_dropout[c("Option A", "Option B"), "Delivery", ] <- rep(pars$percent_art_delivery["Percent starting ART retained at delivery", ], each = 2)
   }
   pmtct_dropout[pmtct_dropout_eligible, "<12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
-                                                                                              c("Monthly dropout breastfeeding: ART 0-12 months breastfeeding"), ], each = 5)
+                                                                                              c("Monthly dropout breastfeeding: ART 0-12 months breastfeeding"), ], each = length(pmtct_dropout_eligible))
   pmtct_dropout[pmtct_dropout_eligible, ">12MOS breastfeeding", ] <- rep(pars$arv_regimen[rownames(pars$arv_regimen) %in%
-                                                                                              c("Monthly dropout breastfeeding: ART 12+ months breastfeeding"), ], each = 5)
+                                                                                              c("Monthly dropout breastfeeding: ART 12+ months breastfeeding"), ], each = length(pmtct_dropout_eligible))
   pmtct_dropout[is.na(pmtct_dropout)] <- 0
   pmtct_dropout <- pmtct_dropout / 100
   pmtct_dropout
