@@ -911,7 +911,14 @@ struct AdultHivModelSimulation<Config> {
     // csavr_dll_model = 1: the CSAVR DLL interpolates ART targets as for a
     // mid-year projection whatever the projection period (CSAVR_VARIANT.md, row 1)
     const bool art_midyear = opts.proj_period_int == PROJPERIOD_MIDYEAR || p_ha.csavr_dll_model == 1;
-    if (art_midyear && art_interp_w < 0.5) {
+    // Mid-year files with art_pct_need_start_year = 1: a year whose input is a percent takes the calendar-year
+    // rule below, unshifted, so year t ends at its own percent of the start-of-year need. Read from Spectrum's
+    // stored output, not its code (no 6.17-6.19 executable to hand): USA 6.17 stores coverage equal to year t's
+    // percent 1995-2024, and VNM 6.18 stores ART / need = the 2022-2025 percents by sex, its 2022 switch from
+    // numbers included. Number years keep the half-year shift (VNM 2003-2021 matches with it)
+    const bool pct_own_year = p_ha.art_pct_need_start_year == 1 && opts.proj_period_int == PROJPERIOD_MIDYEAR &&
+      p_ha.csavr_dll_model != 1 && p_ha.adults_on_art_is_percent(s, t);
+    if (art_midyear && !pct_own_year && art_interp_w < 0.5) {
       if (!p_ha.adults_on_art_is_percent(s, t - 2) && !p_ha.adults_on_art_is_percent(s, t - 1)) {
         // case: both values are numbers
         artnum_hts = (0.5 - art_interp_w) * p_ha.adults_on_art(s, t - 2) +
@@ -940,11 +947,11 @@ struct AdultHivModelSimulation<Config> {
       // calendar year (e.g. hts 7/10 for 2019 interpolates December 2018
       // to December 2019)
 
-      if (art_midyear) {
+      if (art_midyear && !pct_own_year) {
         art_interp_w -= 0.5;
       }
 
-      if (p_ha.art_pct_need_start_year == 1 && !art_midyear) {
+      if (p_ha.art_pct_need_start_year == 1 && (!art_midyear || pct_own_year)) {
         // Spectrum AIM: each year-end input that is a percent becomes a number
         // with this year's start-of-year need (calc_art_need_start_year), and
         // the two numbers are interpolated as numbers
