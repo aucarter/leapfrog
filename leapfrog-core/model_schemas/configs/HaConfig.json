@@ -373,6 +373,10 @@
       "num_type": "real_type",
       "dims": ["SS::NS"]
     },
+    "artelig_hm_start_year": {
+      "num_type": "real_type",
+      "dims": ["SS::hDS", "SS::NS"]
+    },
     "Xartelig_15plus": {
       "num_type": "real_type"
     },
