@@ -1074,6 +1074,13 @@ struct AdultHivModelSimulation<Config> {
           p_ha.adults_on_art(s, t - 1) * need : p_ha.adults_on_art(s, t - 1);
         const real_type num_curr = p_ha.adults_on_art_is_percent(s, t) ?
           p_ha.adults_on_art(s, t) * need : p_ha.adults_on_art(s, t);
+        // A percent year closes k/10 of the gap between those on ART and its target at step k, so it ends at the
+        // target whatever the year before; a number year interpolates the two numbers (Spectrum
+        // 2026: a percent year t -> k (T_t - X) / 10 + X, else k (T_t - T_t-1) / 10 + T_t-1). DEU,
+        // first percent year 2022: women's deaths on ART ran 0.65% low with the year interpolated as numbers.
+        if (p_ha.adults_on_art_is_percent(s, t)) {
+          return std::max(art_interp_w * (num_curr - i_ha.Xart_15plus), 0.0);
+        }
         artnum_hts = (1.0 - art_interp_w) * num_prev + art_interp_w * num_curr;
       } else if (!p_ha.adults_on_art_is_percent(s, t - 1) && !p_ha.adults_on_art_is_percent(s, t)) {
         // case: both values are numbers
