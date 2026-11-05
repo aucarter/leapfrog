@@ -653,6 +653,32 @@ struct HivDemographicProjection<Config> {
         }
       }
 
+      // Spectrum (RunDesktopDPModel, 2026 FUN_019a7e54 ~L5055, L5228, L5620, L5790) floors a negative untreated or
+      // on-ART cell at 0 as it ages into 16-80; the age-15 entrants are not floored. THA: negative on-ART cells
+      // entering at 15 otherwise stay negative at 16-17, where the off-ART mortality scale U / (U + A) runs away
+      // (men aged 17 in 2006: -1263 AIDS deaths). The single-age Spectrum path only; the cells removed go back
+      // onto p_hivpop, which the deaths step then scales with them.
+      if constexpr (!ModelVariant::run_virgin) {
+        if (pars.ha.epp_age_model != 1) {
+          int a = p_idx_hiv_first_adult + hAG_span[0];
+          for (int ha = 1; ha < hAG; a += hAG_span[ha], ++ha) {
+            if (hAG_span[ha] != 1) continue;
+            auto floor_at_zero = [&](real_type& x) {
+              if (x < 0.0) {
+                n_ha.p_hivpop(a, s) -= x;
+                x = 0.0;
+              }
+            };
+            for (int hm = 0; hm < hDS; ++hm) {
+              floor_at_zero(n_ha.h_hivpop(hm, ha, s));
+              if (t > opts.ts_art_start) {
+                for (int hu = 0; hu < hTS; ++hu) floor_at_zero(n_ha.h_artpop(hu, hm, ha, s));
+              }
+            }
+          }
+        }
+      }
+
       // age out of ha = 0 group
       int ha = 0;
       for (int hm = 0; hm < hDS; ++hm) {
