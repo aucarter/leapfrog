@@ -169,22 +169,26 @@ struct HivDemographicProjection<Config> {
       // age, children included: in 2026 AUS, years whose only non-zero entries
       // are at ages 0-14 store exactly those child migrants and none at 15+.
       // Children take the input by single age, with the same empty-age rule.
+      //
+      // Spectrum (2026 ProcessHIVPosMigrants, FUN_019e317c, after Do_AIDS_calculations) adds, at each single age,
+      // mig x stratum / (total - HIV-negative), from populations it stores as float32. An age is empty when the two
+      // floats are equal, and the denominator is a whole number of float steps, so an age holding a fraction of an
+      // HIV+ person takes 0, 1x or 2x its input (PHL 1990, F 15: HIV+ 0.117, step 0.0625, applied 1.865 x input).
+      // The same arithmetic on leapfrog's populations reproduces the rule; which near-empty ages take migrants can
+      // still differ, because the floats Spectrum rounds are its own.
       if (p_ha.csavr_dll_model != 1 && hivmigr_input_on) {
         auto& n_dp = state_next.dp;
-        for (int a = 0; a < p_idx_hiv_first_adult; ++a) {
-          const real_type mig = n_ha.p_hivpop(a, s) > 0.0 ? p_ha.hiv_migrants_by_age(a, s, t) : 0.0;
+        auto applied = [&](int a) -> real_type {
+          const real_type tot = n_dp.p_totpop(a, s) - n_ha.p_net_migration_hivpop(a, s);
+          const real_type hiv = n_ha.p_hivpop(a, s);
+          const real_type d = static_cast<real_type>(static_cast<float>(tot)) -
+                              static_cast<real_type>(static_cast<float>(tot - hiv));
+          return d > 0.0 ? p_ha.hiv_migrants_by_age(a, s, t) * hiv / d : 0.0;
+        };
+        for (int a = 0; a < pAG; ++a) {
+          const real_type mig = applied(a);
           n_dp.p_totpop(a, s) += mig - n_ha.p_net_migration_hivpop(a, s);
           n_ha.p_net_migration_hivpop(a, s) = mig;
-        }
-        int a = p_idx_hiv_first_adult;
-        for (int ha = 0; ha < hAG; ++ha) {
-          real_type hivpop_ha = 0.0;
-          for (int i = 0; i < hAG_span[ha]; ++i) hivpop_ha += n_ha.p_hivpop(a + i, s);
-          for (int i = 0; i < hAG_span[ha]; ++i, ++a) {
-            const real_type mig = hivpop_ha > 0.0 ? p_ha.hiv_migrants_by_age(a, s, t) : 0.0;
-            n_dp.p_totpop(a, s) += mig - n_ha.p_net_migration_hivpop(a, s);
-            n_ha.p_net_migration_hivpop(a, s) = mig;
-          }
         }
       }
       if (hivmigr_on) {
