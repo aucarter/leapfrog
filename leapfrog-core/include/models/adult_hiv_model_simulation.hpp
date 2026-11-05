@@ -829,6 +829,17 @@ struct AdultHivModelSimulation<Config> {
                               opts.dt * i_ha.gradART(hu, hm, ha, s);
         }
       }
+      // Spectrum counts everyone on ART, whatever their CD4 stage (every stage,
+      // stages 2-8, ages 15-80). The loop above starts at the stage ever eligible, which misses age-15 entrants who
+      // arrive on ART in higher adult stages: AUS 2007-14, leapfrog's year-end ART ran 0.2-3.4 above the number
+      // target and the excess carried from year to year. EPP's age model keeps its own count.
+      if (p_ha.epp_age_model != 1) {
+        for (int hm = 0; hm < i_ha.everARTelig_idx; ++hm) {
+          for (int hu = 0; hu < hTS; ++hu) {
+            i_ha.Xart_15plus += n_ha.h_artpop(hu, hm, ha, s) + opts.dt * i_ha.gradART(hu, hm, ha, s);
+          }
+        }
+      }
 
       // Pregnant women below the CD4 threshold (e.g. Option B+): in each stage
       // the eligible number is the age group's births times the FRR-weighted
