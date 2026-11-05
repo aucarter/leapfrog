@@ -2,6 +2,10 @@ test_that("ART allocation method 4 initiates the lowest CD4 stage first", {
   pjnz <- system.file("pjnz/bwa_aim-adult-art-no-special-elig_v6.13_2022-04-18.PJNZ", package = "leapfrog")
   years <- 1970:2030
   p <- process_pjnz(pjnz, use_coarse_age_groups = TRUE, extract_child_params = TRUE)
+  ## no special-population or pregnant-women eligibility (this file has none)
+  n_years <- dim(p$basepop)[3]
+  p[c("specpop_percelig", "specpop_percelig_by_sex", "pw_artelig", "who34percelig")] <-
+    list(rep(0, n_years), matrix(0, 2, n_years), rep(0L, n_years), 0)
   expect_type(p$art_alloc_method, "integer")
   run <- function(method) run_model(modifyList(p, list(art_alloc_method = as.integer(method))), "CoarseChildModel", years)
   m1 <- run(1)
