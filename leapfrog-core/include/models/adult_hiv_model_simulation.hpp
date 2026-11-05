@@ -881,9 +881,20 @@ struct AdultHivModelSimulation<Config> {
           }
           const real_type frr = p_ha.fert_mult_by_age(hf, t);
           const real_type den = pop_ha - hiv_ha + frr * hiv_ha;
+          // EligiblePregnantWomen reads the CD4 threshold raw, so with a threshold of 200 its women above the
+          // threshold include the 200-250 stage; FUN_019c3d78 shares the result over the stages above 250 only
+          // (the copy where 200 becomes 250, Do_AIDS_calculations L2611-2615). idx_hm_elig 3 is a threshold of 200
+          // (see cap_artinit_at_need). MYS women 2008 (pregnant women eligible from 1998): CD4 > 250 on ART ran 6% low.
+          const int raw_idx = cd4elig_idx == 3 ? 4 : cd4elig_idx;
+          real_type above = 0.0, above_raw = 0.0;
+          for (int hm = 0; hm < raw_idx; ++hm) {
+            above_raw += n_ha.h_hivpop(hm, ha, s);
+            if (hm < cd4elig_idx) above += n_ha.h_hivpop(hm, ha, s);
+          }
+          const real_type share_up = above > 0.0 ? above_raw / above : 1.0;
           if (den > 0.0) {
             for (int hm = i_ha.anyelig_idx; hm < cd4elig_idx; ++hm) {
-              const real_type pw_elig = births_ha * frr * n_ha.h_hivpop(hm, ha, s) / den;
+              const real_type pw_elig = births_ha * frr * n_ha.h_hivpop(hm, ha, s) * share_up / den;
               i_ha.artelig_hahm(hm, hf) += pw_elig;
               i_ha.artelig_hm(hm) += pw_elig;
               i_ha.Xartelig_15plus += pw_elig;
