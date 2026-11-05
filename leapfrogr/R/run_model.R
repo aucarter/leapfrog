@@ -155,6 +155,9 @@ process_parameters_to_cpp <- function(parameters) {
   if ("sr_intervention_mult" %in% names(parameters)) {
     parameters <- pad_sr_classes(parameters, 5L)
     if (is.null(parameters[["sr_class_memory"]])) parameters[["sr_class_memory"]] <- 0L
+    # 0: one partner pool over both sexes (reproduces earlier builds);
+    # 1: each sex draws partners from the opposite sex (methods appendix §4.1).
+    if (is.null(parameters[["sr_mixing_mode"]])) parameters[["sr_mixing_mode"]] <- 0L
   }
 
   parameters

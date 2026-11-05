@@ -40,6 +40,9 @@
     "sr_class_memory": {
       "num_type": "int"
     },
+    "sr_mixing_mode": {
+      "num_type": "int"
+    },
     "sr_hc_art_init_replay": {
       "num_type": "real_type",
       "dims": ["SS::hcAG_c", "opts.proj_steps"]

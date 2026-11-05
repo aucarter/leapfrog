@@ -485,9 +485,18 @@ struct AdultHivModelSimulation<Config> {
       }
     }
 
-    // -- 3. Contact-weighted infectious prevalence pool P_eff (pooled over
-    //    both sexes; §4.1). Sg(a,s,g) = pi * (1 - sum_k q_k) * hivn. ---------
-    real_type pool_num = 0.0, pool_den = 0.0;
+    // -- 3. Contact-weighted infectious prevalence pool P_eff (§4.1).
+    //    Sg(a,s,g) = pi * (1 - sum_k q_k) * hivn.
+    //    sr_mixing_mode 0 (default) pools both sexes into one scalar that every
+    //    susceptible sees, so sex differences in exposure enter only through
+    //    incidence_rate_ratio_sex. Mode 1 is the methods-appendix form: a
+    //    susceptible of sex s draws partners from the opposite sex s',
+    //    P_eff[s] = sum_g c_g omega_{s'} I_{s',g} / sum_g c_g N_{s',g}. --------
+    static_assert(NS == 2, "opposite-sex mixing assumes two sexes");
+    const bool opposite_sex = (p_sr.sr_mixing_mode == 1);
+    real_type pool_num = 0.0, pool_den = 0.0;         // both sexes, mode 0
+    real_type pool_num_s[NS] = {0.0, 0.0};            // by contributing sex
+    real_type pool_den_s[NS] = {0.0, 0.0};
     for (int s = 0; s < NS; ++s) {
       for (int g = 0; g < NCLASS; ++g) {
         const real_type cg = p_sr.sr_contact_rate(g);
@@ -499,22 +508,44 @@ struct AdultHivModelSimulation<Config> {
           if (qtot > 1.0) qtot = 1.0;
           Nsg += p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * hivn;
         }
-        pool_num += cg * omega[s] * n_sr.sr_infected_class(s, g);
-        pool_den += cg * Nsg;
+        const real_type num_sg = cg * omega[s] * n_sr.sr_infected_class(s, g);
+        const real_type den_sg = cg * Nsg;
+        pool_num += num_sg;                            // same order as before
+        pool_den += den_sg;                            // the option: mode 0
+        pool_num_s[s] += num_sg;                       // is bit-identical
+        pool_den_s[s] += den_sg;
       }
     }
-    const real_type P_eff = pool_den > 0.0 ? pool_num / pool_den : 0.0;
+    real_type P_eff[NS];
+    for (int s = 0; s < NS; ++s) {
+      if (opposite_sex) {
+        const int so = 1 - s;
+        P_eff[s] = pool_den_s[so] > 0.0 ? pool_num_s[so] / pool_den_s[so] : 0.0;
+      } else {
+        P_eff[s] = pool_den > 0.0 ? pool_num / pool_den : 0.0;
+      }
+    }
 
     // -- 4. Mean-preserving age/sex shape zeta, normalized over susceptibles
-    //    (15-49) so it sets the incidence distribution, not its level (§4.1). -
+    //    (15-49) so it sets the incidence distribution, not its level (§4.1).
+    //    Under mode 1 the weights also carry each sex's pool, so the
+    //    susceptible-weighted 15-49 incidence is r_struct * Pbar, Pbar the
+    //    susceptible-weighted mean of P_eff[s] (§4.1). zbar is one scalar for
+    //    both sexes, so this moves only the level, never the sex ratio. -----
     real_type zbar_num = 0.0, zbar_den = 0.0;
     for (int s = 0; s < NS; ++s) {
       const real_type sexrr = (s == MALE) ? 1.0 : p_ha.incidence_rate_ratio_sex(t);
+      const real_type wP = opposite_sex ? P_eff[s] : 1.0;
       for (int a = a_lo; a < a_hi; ++a) {
         const real_type hivn = atrisk_hivn[a][s];
         const real_type zeta = p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * sexrr;
-        zbar_num += zeta * hivn;
-        zbar_den += hivn;
+        if (opposite_sex) {
+          zbar_num += zeta * wP * hivn;
+          zbar_den += wP * hivn;
+        } else {
+          zbar_num += zeta * hivn;
+          zbar_den += hivn;
+        }
       }
     }
     const real_type zbar = zbar_den > 0.0 ? zbar_num / zbar_den : 1.0;
@@ -539,7 +570,7 @@ struct AdultHivModelSimulation<Config> {
         for (int g = 0; g < NCLASS; ++g) {
           const real_type cg = p_sr.sr_contact_rate(g);
           const real_type Sg = p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * hivn;
-          const real_type lambda = r_struct * cg * P_eff * zeta * p_sr.sr_intervention_mult(a, s, g, t);
+          const real_type lambda = r_struct * cg * P_eff[s] * zeta * p_sr.sr_intervention_mult(a, s, g, t);
           real_type inf = lambda * Sg;
           if (seeding) inf += p_ha.initial_incidence * Sg;     // epidemic seed
           i_ha.p_infections_ts(a, s) += inf;

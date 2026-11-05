@@ -940,6 +940,8 @@ type
     srArtInitModeLength: Integer;
     srClassMemory: Integer;
     srClassMemoryLength: Integer;
+    srMixingMode: Integer;
+    srMixingModeLength: Integer;
     srHcArtInitReplay: PDouble;
     srHcArtInitReplayLength: Integer;
     srArtInitReplay: PDouble;
@@ -957,6 +959,7 @@ type
     srKpInterventionMult: TGBFixedArray<Double>;
     srArtInitMode: Integer;
     srClassMemory: Integer;
+    srMixingMode: Integer;
     srHcArtInitReplay: TGBFixedArray<Double>;
     srArtInitReplay: TGBFixedArray<Double>;
     function getView(): LeapfrogSexualRiskParamsView;
@@ -1881,6 +1884,8 @@ begin;
   Result.srArtInitModeLength := 1;
   Result.srClassMemory := srClassMemory;
   Result.srClassMemoryLength := 1;
+  Result.srMixingMode := srMixingMode;
+  Result.srMixingModeLength := 1;
   Result.srHcArtInitReplay := PDouble(srHcArtInitReplay.data);
   Result.srHcArtInitReplayLength := srHcArtInitReplay.GetLength();
   Result.srArtInitReplay := PDouble(srArtInitReplay.data);
