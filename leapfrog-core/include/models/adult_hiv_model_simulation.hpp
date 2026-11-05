@@ -812,6 +812,45 @@ struct AdultHivModelSimulation<Config> {
       // eligibility; hiv_negative_pop is from before them). Virgin-stratified
       // variants keep their own at-risk definition.
       const int hf = ha - hIDX_15PLUS;
+      // Spectrum (2026, added per CD4 stage): per single age a,
+      // births to its untreated women above the threshold, f_a FRR U / (1 - prev + FRR prev), shared over the stages
+      // above the threshold by untreated. f_a is the five-year group's mean rate (TFR x ASFR share / 5), FRR the age
+      // group's HIV fertility ratio with no CD4 discount or local adjustment, and prev counts everyone HIV+, on ART
+      // or not. Virgin-stratified variants keep their own at-risk definition below.
+      if constexpr (!ModelVariant::run_virgin) {
+        if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility && p_ha.epp_age_model != 1) {
+          const auto& p_dp = pars.dp;
+          const auto& n_dp = state_next.dp;
+          int a0 = p_idx_hiv_first_adult;
+          for (int h = 0; h < ha; ++h) a0 += hAG_span[h];
+          real_type births_ha = 0.0, pop_ha = 0.0, hiv_ha = 0.0;
+          for (int a = a0; a < a0 + hAG_span[ha]; ++a) {
+            const int i = a - p_idx_fertility_first, g0 = i - i % 5;
+            real_type f = 0.0;
+            for (int j = g0; j < std::min(g0 + 5, p_fertility_age_groups); ++j) f += p_dp.age_specific_fertility_rate(j, t);
+            births_ha += n_dp.p_totpop(a, s) * f / 5.0;
+            pop_ha += n_dp.p_totpop(a, s);
+          }
+          for (int hm = 0; hm < hDS; ++hm) {
+            hiv_ha += n_ha.h_hivpop(hm, ha, s);
+            for (int hu = 0; hu < hTS; ++hu) hiv_ha += n_ha.h_artpop(hu, hm, ha, s);
+          }
+          const real_type frr = p_ha.fert_mult_by_age(hf, t);
+          const real_type den = pop_ha - hiv_ha + frr * hiv_ha;
+          if (den > 0.0) {
+            for (int hm = i_ha.anyelig_idx; hm < cd4elig_idx; ++hm) {
+              const real_type pw_elig = births_ha * frr * n_ha.h_hivpop(hm, ha, s) / den;
+              i_ha.artelig_hahm(hm, hf) += pw_elig;
+              i_ha.artelig_hm(hm) += pw_elig;
+              i_ha.Xartelig_15plus += pw_elig;
+              const real_type expect_mort = p_ha.cd4_mortality(hm, ha, s) * pw_elig;
+              i_ha.expect_mort_artelig_hm(hm) += expect_mort;
+              i_ha.expect_mort_artelig15plus += expect_mort;
+            }
+          }
+          continue;
+        }
+      }
       if (s == FEMALE && p_ha.pw_artelig(t) > 0 && hf < hAG_fertility) {
         const auto& p_dp = pars.dp;
         const auto& c_dp = state_curr.dp;
