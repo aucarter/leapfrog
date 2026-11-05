@@ -75,7 +75,9 @@ struct AdultHivModelSimulation<Config> {
     // With ART entered as percent by CD4, a stage with coverage is open to
     // initiation whatever the CD4 threshold.
     auto anyelig_at = [&](int tt) {
-      if (p_ha.specpop_percelig(tt) > 0.0 || p_ha.pw_artelig(tt) > 0) return 0;
+      const bool specpop = p_ha.epp_age_model == 1 ? p_ha.specpop_percelig(tt) > 0.0 :
+        p_ha.specpop_percelig_by_sex(MALE, tt) > 0.0 || p_ha.specpop_percelig_by_sex(FEMALE, tt) > 0.0;
+      if (specpop || p_ha.pw_artelig(tt) > 0) return 0;
       int idx = p_ha.who34percelig > 0.0 ? 2 : p_ha.idx_hm_elig(tt);
       if (p_ha.art_entry_option == SS::ART_ENTRY_PERCENT_BY_CD4) {
         for (int hm = 0; hm < idx; ++hm) {
@@ -768,14 +770,19 @@ struct AdultHivModelSimulation<Config> {
     nda::fill(i_ha.expect_mort_artelig_hm, 0.0);
 
     const int cd4elig_idx = p_ha.idx_hm_elig(t);
+    // Special populations eligible regardless of CD4: EPP's age model applies
+    // one share to both sexes; Spectrum applies sex workers to women only and
+    // MSM to men only, so the
+    // Spectrum path takes the share by sex
+    const real_type specpop = p_ha.epp_age_model == 1 ? p_ha.specpop_percelig(t) :
+                                                        p_ha.specpop_percelig_by_sex(s, t);
     for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
       for (int hm = i_ha.everARTelig_idx; hm < hDS; ++hm) {
         if (hm >= i_ha.anyelig_idx) {
           // Special populations: below the CD4 threshold a share
-          // specpop_percelig is eligible (with WHO stage 3/4 from stage 2)
+          // specpop is eligible (with WHO stage 3/4 from stage 2)
           const real_type prop_elig = hm >= cd4elig_idx ? 1.0 :
-            (hm >= 2 ? 1.0 - (1.0 - p_ha.specpop_percelig(t)) * (1.0 - p_ha.who34percelig) :
-                       p_ha.specpop_percelig(t));
+            (hm >= 2 ? 1.0 - (1.0 - specpop) * (1.0 - p_ha.who34percelig) : specpop);
           const real_type artelig = prop_elig * n_ha.h_hivpop(hm, ha, s);
           i_ha.artelig_hahm(hm, ha - hIDX_15PLUS) = artelig;
           i_ha.artelig_hm(hm) += artelig;

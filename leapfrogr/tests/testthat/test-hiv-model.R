@@ -261,7 +261,8 @@ test_that("static age-15 entrants variants add the supplied HIV+ inflow", {
     p <- process_pjnz(pjnz, use_coarse_age_groups = coarse)
     n_years <- dim(p$basepop)[3]
     ## no special-population or pregnant-women eligibility (this file has none)
-    p[c("specpop_percelig", "pw_artelig", "who34percelig")] <- list(rep(0, n_years), rep(0L, n_years), 0)
+    p[c("specpop_percelig", "specpop_percelig_by_sex", "pw_artelig", "who34percelig")] <-
+      list(rep(0, n_years), matrix(0, 2, n_years), rep(0L, n_years), 0)
     hDS <- dim(p$cd4_mort)[1]; hTS <- dim(p$art_mort)[1]
     entrants <- function(prev, paedsurv = 1, migrants = 0, migrant_hiv_prob = 0) list(
       entrantprev = matrix(prev, 2, n_years),
