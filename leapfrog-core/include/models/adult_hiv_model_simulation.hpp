@@ -751,7 +751,7 @@ struct AdultHivModelSimulation<Config> {
       // Spectrum ART allocation is a 2-step process
       // 1. Allocate by CD4 category (weighted by 'eligible' and 'expected mortality')
       // 2. Allocate by age groups (weighted only by eligibility)
-      allocate_art_initiation_by_cd4();
+      allocate_art_initiation_by_cd4(s);
       allocate_art_initiation_by_age(s);
     }
   };
@@ -1136,8 +1136,9 @@ struct AdultHivModelSimulation<Config> {
   // epp_age_model = 1 mixes the two shares and allocates once, with no stage cap (eppasm, and EPP's age model:
   // AgeModel.run_hiv_model, art_alloc_method other than 4); the cap then acts per age group in
   // allocate_art_initiation_by_age()
-  void allocate_art_initiation_by_cd4() {
+  void allocate_art_initiation_by_cd4(int s) {
     const auto& p_ha = pars.ha;
+    const auto& n_ha = state_next.ha;
     auto& i_ha = intermediate.ha;
     // initiation_allocation_method = 4 (Spectrum NewARTPatAllocationMethod 4): lowest CD4 first. Each stage, from the
     // lowest, initiates all its eligible before the next stage up receives any, and the weights are not used
@@ -1165,10 +1166,18 @@ struct AdultHivModelSimulation<Config> {
       }
       return;
     }
+    // Spectrum's expected mortality (2026 FUN_019c47c4, rates set in Do_AIDS_calculations at 0x19c7b38): the
+    // stage's eligible times its untreated-weighted mean of the unscaled off-ART AIDS mortality plus off-ART
+    // non-AIDS excess mortality, ages 15-80
     real_type w_elig[hDS] = {0.0}, w_mort[hDS] = {0.0}, a_elig[hDS] = {0.0}, a_mort[hDS] = {0.0};
     for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
       w_elig[hm] = i_ha.artelig_hm(hm);
-      w_mort[hm] = i_ha.expect_mort_artelig_hm(hm);
+      real_type mx = 0.0, untreated = 0.0;
+      for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
+        mx += (p_ha.cd4_mortality(hm, ha, s) + p_ha.cd4_nonaids_excess_mort(hm, ha, s)) * n_ha.h_hivpop(hm, ha, s);
+        untreated += n_ha.h_hivpop(hm, ha, s);
+      }
+      w_mort[hm] = untreated > 0.0 ? i_ha.artelig_hm(hm) * mx / untreated : 0.0;
     }
     fill_cd4_stages(w_elig, i_ha.artinit_hts, a_elig);
     fill_cd4_stages(w_mort, i_ha.artinit_hts, a_mort);
