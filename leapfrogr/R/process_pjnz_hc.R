@@ -507,7 +507,7 @@ process_pjnz_hc <- function(dat, pars, dim_vars, dp_params, use_coarse_age_group
 
   ## Spectrum multiplies off-ART child mortality by <ChildMortalityRates MV2> only when the country code is 710
   ## (South Africa); every other file gets 1 whatever the tag holds (Spectrum 2026). Rows 3 and 4
-  ## are taken for ages 0-4 and 5-14, from the getter's index (2, age group); the 2026 ZAF file's four rows are equal.
+  ## are taken for ages 0-4 and 5-14; the 2026 ZAF file's four rows are equal.
   hc_noart_mort_mult <- matrix(1, nrow = 2L, ncol = length(proj_years))
   if (isTRUE(pars$country_code == 710L) && !is.null(pars$child_mortality_rates)) {
     hc_noart_mort_mult[] <- unname(as.matrix(pars$child_mortality_rates)[3:4, seq_along(proj_years)])

@@ -758,10 +758,9 @@ struct AdultHivModelSimulation<Config> {
     }
   };
 
-  // Spectrum (2026)
-  // caps the step's initiations at the eligible untreated, 15-80, from the raw adult CD4 threshold: the call at
-  // compares the threshold as entered with the stage bounds, while the allocation uses a copy
-  // in which a threshold of 200 is set to 250. So with a threshold of 200 the 200-250 stage
+  // Spectrum (2026) caps the step's initiations at the eligible untreated, 15-80, judged against the adult CD4
+  // threshold as entered, while its allocation treats a threshold of 200 as 250. So with a threshold of 200 the
+  // 200-250 stage
   // is allocated to but not counted in the cap; it counts its special-population share only, and pregnant women
   // are left out. leapfrog's idx_hm_elig is 3 (0-based) for a threshold of 200, which is the only input that maps
   // there in the 2026 files (thresholds 200, 350, 500, 999). AUS women 1999-2002, NLD 2001-04, DEU 2003-04: the
@@ -829,8 +828,7 @@ struct AdultHivModelSimulation<Config> {
                               opts.dt * i_ha.gradART(hu, hm, ha, s);
         }
       }
-      // Spectrum counts everyone on ART, whatever their CD4 stage (every stage,
-      // stages 2-8, ages 15-80). The loop above starts at the stage ever eligible, which misses age-15 entrants who
+      // Spectrum counts everyone on ART, whatever their CD4 stage (ages 15-80). The loop above starts at the stage ever eligible, which misses age-15 entrants who
       // arrive on ART in higher adult stages: AUS 2007-14, leapfrog's year-end ART ran 0.2-3.4 above the number
       // target and the excess carried from year to year. EPP's age model keeps its own count.
       if (p_ha.epp_age_model != 1) {
@@ -843,8 +841,7 @@ struct AdultHivModelSimulation<Config> {
 
       // Pregnant women below the CD4 threshold (e.g. Option B+): in each stage
       // the eligible number is the age group's births times the FRR-weighted
-      // HIV+ share of its women, as EPP's age model (
-      // pw_artelig) and eppasm. Births use the women averaged over the
+      // HIV+ share of its women, as EPP's age model (pw_artelig) and eppasm. Births use the women averaged over the
       // previous and current year.
       //
       // epp_age_model = 1, as EPP's age model: births are the year's, from
@@ -957,10 +954,8 @@ struct AdultHivModelSimulation<Config> {
   // eligible untreated (special populations and pregnant women included), 15+,
   // from the population after the year's ageing and non-HIV deaths and before
   // its first HIV time step, so none of the year's new infections, progression
-  // or ART initiation, as Spectrum 2026 sums it: before
-  // running year t's ART it sums state[t] into the need
-  // (ARTCalc field 2, by sex), then converts the year t - 1 and year t inputs
-  // with that one need. CAN 2030 (95% for both sexes): stored ART over stored
+  // or ART initiation. Spectrum 2026 sums it by sex once, before running year t's ART,
+  // then converts the year t - 1 and year t inputs with that one need. CAN 2030 (95% for both sexes): stored ART over stored
   // need is 95.000%. Called at hiv_step 0, before this step's gradients are
   // applied to h_hivpop and h_artpop.
   void calc_art_need_start_year(int s) {
@@ -1255,9 +1250,8 @@ struct AdultHivModelSimulation<Config> {
   // eligibility, capped by the population actually available to initiate
   //
   // epp_age_model = 1: the available population includes the step's new
-  // infections, which EPP's age model adds to grad before the ART block
-  // ; otherwise they are held in grad_infections until
-  // the update. The cap binds only when every eligible person is initiated.
+  // infections, which EPP's age model adds to grad before the ART block;
+  // otherwise they are held in grad_infections until the update. The cap binds only when every eligible person is initiated.
   void allocate_art_initiation_by_age(int s) {
     const auto& p_ha = pars.ha;
     auto& n_ha = state_next.ha;
