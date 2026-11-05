@@ -747,6 +747,7 @@ struct AdultHivModelSimulation<Config> {
         i_ha.artinit_hts = calc_artinit_from_initiation_rate(s);
       } else {
         i_ha.artinit_hts = calc_artinit_from_number_or_percent(s, hiv_step);
+        cap_artinit_at_need(s);
       }
 
       // Spectrum ART allocation is a 2-step process
@@ -755,6 +756,33 @@ struct AdultHivModelSimulation<Config> {
       allocate_art_initiation_by_cd4(s);
       allocate_art_initiation_by_age(s);
     }
+  };
+
+  // Spectrum (2026)
+  // caps the step's initiations at the eligible untreated, 15-80, from the raw adult CD4 threshold: the call at
+  // compares the threshold as entered with the stage bounds, while the allocation uses a copy
+  // in which a threshold of 200 is set to 250. So with a threshold of 200 the 200-250 stage
+  // is allocated to but not counted in the cap; it counts its special-population share only, and pregnant women
+  // are left out. leapfrog's idx_hm_elig is 3 (0-based) for a threshold of 200, which is the only input that maps
+  // there in the 2026 files (thresholds 200, 350, 500, 999). AUS women 1999-2002, NLD 2001-04, DEU 2003-04: the
+  // target outran this need and leapfrog started 3-7% more women than Spectrum.
+  void cap_artinit_at_need(int s) {
+    const auto& p_ha = pars.ha;
+    const auto& n_ha = state_next.ha;
+    auto& i_ha = intermediate.ha;
+    if (p_ha.epp_age_model == 1 || p_ha.csavr_dll_model == 1) return;
+    const int idx = p_ha.idx_hm_elig(t);
+    const int raw_idx = idx == 3 ? 4 : idx;
+    const real_type specpop = p_ha.specpop_percelig_by_sex(s, t);
+    real_type need = 0.0;
+    for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
+      for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
+        const real_type prop = hm >= raw_idx ? 1.0 :
+          (hm >= 2 ? 1.0 - (1.0 - specpop) * (1.0 - p_ha.who34percelig) : specpop);
+        need += prop * n_ha.h_hivpop(hm, ha, s);
+      }
+    }
+    i_ha.artinit_hts = std::min(i_ha.artinit_hts, need);
   };
 
   // Number eligible to start ART, their expected mortality, and the number
