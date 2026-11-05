@@ -158,6 +158,12 @@ process_parameters_to_cpp <- function(parameters) {
     # 0: one partner pool over both sexes (reproduces earlier builds);
     # 1: each sex draws partners from the opposite sex (methods appendix §4.1).
     if (is.null(parameters[["sr_mixing_mode"]])) parameters[["sr_mixing_mode"]] <- 0L
+    # KP hazard = IRR_k x the susceptible-weighted general-pop hazard of the
+    # same age/sex x M_k. 0: that hazard includes the general-pop intervention
+    # multiplier, so M_k is a KP-specific factor on top (reproduces earlier
+    # builds); 1: the multiplier is removed, so M_k is the KP's whole
+    # intervention effect (absolute KP coverage).
+    if (is.null(parameters[["sr_kp_reference"]])) parameters[["sr_kp_reference"]] <- 0L
   }
 
   parameters

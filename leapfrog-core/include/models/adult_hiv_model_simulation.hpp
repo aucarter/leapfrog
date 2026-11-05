@@ -567,10 +567,12 @@ struct AdultHivModelSimulation<Config> {
         const real_type zeta = p_ha.incidence_rate_ratio_age(a - SS::p_idx_hiv_first_adult, s, t) * sexrr / zbar;
 
         real_type inf_gen_as = 0.0, Sg_as = 0.0;
+        real_type inf_gen_noM_as = 0.0;   // sr_kp_reference 1: general-pop infections with M removed
         for (int g = 0; g < NCLASS; ++g) {
           const real_type cg = p_sr.sr_contact_rate(g);
           const real_type Sg = p_sr.sr_class_prop(a, s, g, t) * (1.0 - qtot) * hivn;
           const real_type lambda = r_struct * cg * P_eff[s] * zeta * p_sr.sr_intervention_mult(a, s, g, t);
+          inf_gen_noM_as += r_struct * cg * P_eff[s] * zeta * Sg;
           real_type inf = lambda * Sg;
           if (seeding) inf += p_ha.initial_incidence * Sg;     // epidemic seed
           i_ha.p_infections_ts(a, s) += inf;
@@ -580,12 +582,29 @@ struct AdultHivModelSimulation<Config> {
           if (a >= a_lo && a < a_hi) newinf_class[s][g] += inf;
         }
 
-        // KP overlay: lambda_k = irr_k * lam_bar_{a,s} * M_k on KP susceptibles
+        // KP overlay: lambda_k = irr_k * lam_ref_{a,s} * M_k on KP susceptibles.
+        //  sr_kp_reference 0 (default): lam_ref is lam_bar, the susceptible-
+        //    weighted general-pop hazard of the same age/sex. It includes the
+        //    no-sex class and the general-pop M (and the epidemic seed), so
+        //    M_k = 1 lets KP members inherit general-pop interventions.
+        //  sr_kp_reference 1: lam_ref is the same susceptible-weighted
+        //    general-pop hazard with the intervention multiplier removed, so
+        //    M_k carries ALL of the KP's intervention effect as absolute KP
+        //    coverage (M_k = 1: no intervention reaches KP members; M_k = the
+        //    susceptible-weighted general-pop M reproduces mode 0). The
+        //    reference group is unchanged: SHIPP's KP IRRs are relative to the
+        //    general population of the same age/sex (naomi.utils R/shipp.R:
+        //    incidence_fsw / _msm / _pwid = genpop incidence * rr). The epidemic
+        //    seed is scaled by irr_k but not by M_k, as it is in mode 0 (where
+        //    it sits inside lam_bar), so the modes agree when M_k = M.
+        const bool kp_ref_noM = (p_sr.sr_kp_reference == 1);
         const real_type lam_bar = Sg_as > 0.0 ? inf_gen_as / Sg_as : 0.0;
+        const real_type lam_ref = Sg_as > 0.0 ? inf_gen_noM_as / Sg_as : 0.0;
         for (int k = 0; k < NKP; ++k) {
           const real_type Skp = p_sr.sr_kp_prop(a, s, k, t) * hivn;
-          const real_type inf_kp = p_sr.sr_kp_irr(k, t) * lam_bar *
-                                   p_sr.sr_kp_intervention_mult(a, s, k, t) * Skp;
+          real_type inf_kp = p_sr.sr_kp_irr(k, t) * (kp_ref_noM ? lam_ref : lam_bar) *
+                             p_sr.sr_kp_intervention_mult(a, s, k, t) * Skp;
+          if (kp_ref_noM && seeding) inf_kp += p_sr.sr_kp_irr(k, t) * p_ha.initial_incidence * Skp;
           i_ha.p_infections_ts(a, s) += inf_kp;
           n_sr.sr_infections_kp(s, k) += opts.dt * inf_kp;
         }
