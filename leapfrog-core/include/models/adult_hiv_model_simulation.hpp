@@ -727,7 +727,10 @@ struct AdultHivModelSimulation<Config> {
 
     for (int s = 0; s < NS; ++s) {
       calc_art_eligibility(s);
-      if (hiv_step == 0) calc_art_need_start_year(s);
+      if (hiv_step == 0) {
+        calc_art_need_start_year(s);
+        for (int hm = 0; hm < hDS; ++hm) i_ha.artelig_hm_start_year(hm, s) = i_ha.artelig_hm(hm);
+      }
 
       // How many people we aim to put on ART this time step.
       // There are 3 ART entry options at the moment
@@ -1101,10 +1104,10 @@ struct AdultHivModelSimulation<Config> {
   // expected mortality
   // Distribute total initiations over CD4 stages by the given weights; a stage cannot take more than its eligible
   // population at the start of the step, and what it cannot take passes to the others by their weights
-  void fill_cd4_stages(const real_type* weight, real_type total, real_type* alloc) {
+  void fill_cd4_stages(const real_type* weight, const real_type* elig, real_type total, real_type* alloc) {
     auto& i_ha = intermediate.ha;
     bool open[hDS] = {false};
-    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) { alloc[hm] = 0.0; open[hm] = i_ha.artelig_hm(hm) > 0.0; }
+    for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) { alloc[hm] = 0.0; open[hm] = elig[hm] > 0.0; }
     real_type remaining = total;
     for (int iter = 0; iter < hDS && remaining > 0.0; ++iter) {
       real_type wsum = 0.0;
@@ -1112,9 +1115,9 @@ struct AdultHivModelSimulation<Config> {
       if (wsum <= 0.0) break;
       bool capped = false;
       for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-        if (open[hm] && alloc[hm] + remaining * weight[hm] / wsum >= i_ha.artelig_hm(hm)) {
-          remaining -= i_ha.artelig_hm(hm) - alloc[hm];
-          alloc[hm] = i_ha.artelig_hm(hm);
+        if (open[hm] && alloc[hm] + remaining * weight[hm] / wsum >= elig[hm]) {
+          remaining -= elig[hm] - alloc[hm];
+          alloc[hm] = elig[hm];
           open[hm] = false;
           capped = true;
         }
@@ -1167,18 +1170,24 @@ struct AdultHivModelSimulation<Config> {
     // Spectrum's expected mortality (2026): the
     // stage's eligible times its untreated-weighted mean of the unscaled off-ART AIDS mortality plus off-ART
     // non-AIDS excess mortality, ages 15-80
+    //
+    // A stage above the CD4 threshold (eligible as special populations or pregnant women) takes its eligible from
+    // the start of the year: Spectrum builds those once, before the year's ten steps,
+    // while stages under the threshold take their
+    // current untreated. KHM: stages 1-2 on ART otherwise ran 4-5% low from 2011.
     real_type w_elig[hDS] = {0.0}, w_mort[hDS] = {0.0}, a_elig[hDS] = {0.0}, a_mort[hDS] = {0.0};
+    const int cd4elig_idx = p_ha.idx_hm_elig(t);
     for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
-      w_elig[hm] = i_ha.artelig_hm(hm);
+      w_elig[hm] = hm < cd4elig_idx ? i_ha.artelig_hm_start_year(hm, s) : i_ha.artelig_hm(hm);
       real_type mx = 0.0, untreated = 0.0;
       for (int ha = hIDX_15PLUS; ha < hAG; ++ha) {
         mx += (p_ha.cd4_mortality(hm, ha, s) + p_ha.cd4_nonaids_excess_mort(hm, ha, s)) * n_ha.h_hivpop(hm, ha, s);
         untreated += n_ha.h_hivpop(hm, ha, s);
       }
-      w_mort[hm] = untreated > 0.0 ? i_ha.artelig_hm(hm) * mx / untreated : 0.0;
+      w_mort[hm] = untreated > 0.0 ? w_elig[hm] * mx / untreated : 0.0;
     }
-    fill_cd4_stages(w_elig, i_ha.artinit_hts, a_elig);
-    fill_cd4_stages(w_mort, i_ha.artinit_hts, a_mort);
+    fill_cd4_stages(w_elig, w_elig, i_ha.artinit_hts, a_elig);
+    fill_cd4_stages(w_mort, w_elig, i_ha.artinit_hts, a_mort);
     for (int hm = i_ha.anyelig_idx; hm < hDS; ++hm) {
       i_ha.artinit_hm(hm) = (1.0 - p_ha.initiation_mortality_weight) * a_elig[hm] +
                             p_ha.initiation_mortality_weight * a_mort[hm];
