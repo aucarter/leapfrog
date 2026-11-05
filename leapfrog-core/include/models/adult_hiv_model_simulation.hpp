@@ -908,17 +908,34 @@ struct AdultHivModelSimulation<Config> {
 
     real_type art_interp_w = opts.dt * (hiv_step + 1.0);
     real_type artnum_hts = 0.0;
+
+    // Mid-year Spectrum (<= 6.19) with AIM's need conversion. Read from SPECTRUM.exe 6.18 (Ghidra,
+    // Do_AIDS_calculations FUN_0197dffc): before the year's time steps, the year t-2, t-1 and t inputs are each
+    // made a number, a percent year's as input x ARTCalc need / 100 (L4010-4274), with the one need FUN_0197af80
+    // sums at the start of year t (L2718: on ART + eligible untreated, 15+). At step k = 1..10, with X the adults
+    // on ART after this step's ART deaths and dropouts (L4942): a year t whose input is a percent initiates
+    // k/10 of the gap to its own target, newART = k/10 (T_t - X) (L4970), so year t ends at T_t whatever the
+    // year before; a number year interpolates the numbers with the half-year shift, T_{t-2} -> T_{t-1} for
+    // k < 5 and T_{t-1} -> T_t after (L5006, L5030), newART = target - X. Floored at 0 (L5047).
+    if (p_ha.art_pct_need_start_year == 1 && opts.proj_period_int == PROJPERIOD_MIDYEAR &&
+        p_ha.csavr_dll_model != 1) {
+      const real_type need = i_ha.art_need_start_year(s);
+      auto art_num = [&](int y) -> real_type {
+        if (y < 0) return 0.0;
+        return p_ha.adults_on_art_is_percent(s, y) ? p_ha.adults_on_art(s, y) * need : p_ha.adults_on_art(s, y);
+      };
+      if (p_ha.adults_on_art_is_percent(s, t)) {
+        return std::max(art_interp_w * (art_num(t) - i_ha.Xart_15plus), 0.0);
+      }
+      const real_type target = art_interp_w < 0.5 ?
+        art_num(t - 2) + (art_interp_w + 0.5) * (art_num(t - 1) - art_num(t - 2)) :
+        art_num(t - 1) + (art_interp_w - 0.5) * (art_num(t) - art_num(t - 1));
+      return std::max(target - i_ha.Xart_15plus, 0.0);
+    }
     // csavr_dll_model = 1: the CSAVR DLL interpolates ART targets as for a
     // mid-year projection whatever the projection period (CSAVR_VARIANT.md, row 1)
     const bool art_midyear = opts.proj_period_int == PROJPERIOD_MIDYEAR || p_ha.csavr_dll_model == 1;
-    // Mid-year files with art_pct_need_start_year = 1: a year whose input is a percent takes the calendar-year
-    // rule below, unshifted, so year t ends at its own percent of the start-of-year need. Read from Spectrum's
-    // stored output, not its code (no 6.17-6.19 executable to hand): USA 6.17 stores coverage equal to year t's
-    // percent 1995-2024, and VNM 6.18 stores ART / need = the 2022-2025 percents by sex, its 2022 switch from
-    // numbers included. Number years keep the half-year shift (VNM 2003-2021 matches with it)
-    const bool pct_own_year = p_ha.art_pct_need_start_year == 1 && opts.proj_period_int == PROJPERIOD_MIDYEAR &&
-      p_ha.csavr_dll_model != 1 && p_ha.adults_on_art_is_percent(s, t);
-    if (art_midyear && !pct_own_year && art_interp_w < 0.5) {
+    if (art_midyear && art_interp_w < 0.5) {
       if (!p_ha.adults_on_art_is_percent(s, t - 2) && !p_ha.adults_on_art_is_percent(s, t - 1)) {
         // case: both values are numbers
         artnum_hts = (0.5 - art_interp_w) * p_ha.adults_on_art(s, t - 2) +
@@ -947,20 +964,17 @@ struct AdultHivModelSimulation<Config> {
       // calendar year (e.g. hts 7/10 for 2019 interpolates December 2018
       // to December 2019)
 
-      if (art_midyear && !pct_own_year) {
+      if (art_midyear) {
         art_interp_w -= 0.5;
       }
 
-      if (p_ha.art_pct_need_start_year == 1 && (!art_midyear || pct_own_year)) {
+      if (p_ha.art_pct_need_start_year == 1 && !art_midyear) {
         // Spectrum AIM: each year-end input that is a percent becomes a number
         // with this year's start-of-year need (calc_art_need_start_year), and
         // the two numbers are interpolated as numbers
         const real_type need = i_ha.art_need_start_year(s);
-        // A mid-year file's number year ends at the mean of its two inputs, so a percent year after one starts there
         const real_type num_prev = p_ha.adults_on_art_is_percent(s, t - 1) ?
-          p_ha.adults_on_art(s, t - 1) * need :
-          (pct_own_year && t >= 2 && !p_ha.adults_on_art_is_percent(s, t - 2) ?
-             0.5 * (p_ha.adults_on_art(s, t - 2) + p_ha.adults_on_art(s, t - 1)) : p_ha.adults_on_art(s, t - 1));
+          p_ha.adults_on_art(s, t - 1) * need : p_ha.adults_on_art(s, t - 1);
         const real_type num_curr = p_ha.adults_on_art_is_percent(s, t) ?
           p_ha.adults_on_art(s, t) * need : p_ha.adults_on_art(s, t);
         artnum_hts = (1.0 - art_interp_w) * num_prev + art_interp_w * num_curr;
