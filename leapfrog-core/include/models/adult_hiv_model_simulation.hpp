@@ -906,6 +906,30 @@ struct AdultHivModelSimulation<Config> {
 
     real_type art_interp_w = opts.dt * (hiv_step + 1.0);
     real_type artnum_hts = 0.0;
+
+    // Mid-year Spectrum (<= 6.19) with AIM's need conversion (as
+    // Spectrum 6.18): before the year's time steps, the year t-2, t-1 and t inputs are each
+    // made a number, a percent year's as input x need / 100, with the one need Spectrum
+    // sums at the start of year t (on ART + eligible untreated, 15+). At step k = 1..10, with X the adults
+    // on ART after this step's ART deaths and dropouts: a year t whose input is a percent initiates
+    // k/10 of the gap to its own target, newART = k/10 (T_t - X), so year t ends at T_t whatever the
+    // year before; a number year interpolates the numbers with the half-year shift, T_{t-2} -> T_{t-1} for
+    // k < 5 and T_{t-1} -> T_t after, newART = target - X. Floored at 0.
+    if (p_ha.art_pct_need_start_year == 1 && opts.proj_period_int == PROJPERIOD_MIDYEAR &&
+        p_ha.csavr_dll_model != 1) {
+      const real_type need = i_ha.art_need_start_year(s);
+      auto art_num = [&](int y) -> real_type {
+        if (y < 0) return 0.0;
+        return p_ha.adults_on_art_is_percent(s, y) ? p_ha.adults_on_art(s, y) * need : p_ha.adults_on_art(s, y);
+      };
+      if (p_ha.adults_on_art_is_percent(s, t)) {
+        return std::max(art_interp_w * (art_num(t) - i_ha.Xart_15plus), 0.0);
+      }
+      const real_type target = art_interp_w < 0.5 ?
+        art_num(t - 2) + (art_interp_w + 0.5) * (art_num(t - 1) - art_num(t - 2)) :
+        art_num(t - 1) + (art_interp_w - 0.5) * (art_num(t) - art_num(t - 1));
+      return std::max(target - i_ha.Xart_15plus, 0.0);
+    }
     // csavr_dll_model = 1: the CSAVR DLL interpolates ART targets as for a
     // mid-year projection whatever the projection period
     const bool art_midyear = opts.proj_period_int == PROJPERIOD_MIDYEAR || p_ha.csavr_dll_model == 1;
